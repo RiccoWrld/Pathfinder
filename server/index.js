@@ -36,6 +36,56 @@ app.get("/db-test", async (req, res) => {
   }
 });
 
+app.post("/api/system/check-alerts", async(req, res) => {
+  try{
+    const gpaAlerts = await pool.query(`
+  INSERT INTO alerts (student_id, advisor_id, message, category)
+  SELECT id, advisor_id, 'Action Required: GPA is currently ' || gpa || '. Schedule an advisor meeting.', 'academic'
+  FROM students
+  WHERE gpa < 2.0
+  AND id NOT IN (SELECT student_id FROM alerts WHERE is_resolved = false)
+`);
+
+      res.json({ success: true, message: "Alert engine proccessed successfully." });
+  }
+  catch (err) {
+    res.status(500).json({ error: err.message})
+  }
+})
+
+app.patch("/api/alerts/:id", async (req, res) => {
+  const {id } = req.params;
+  const { is_resolved } = req.body;
+  try {
+    await pool.query(
+      "UPDATE alerts SET is_resolved = $1 WHERE id = $2",
+      [is_resolved, id]
+    );
+    res.json({ success: true });
+    
+  }
+  catch (err) {
+    res.status(500).json({ error: err.message})
+  }
+});
+
+app.get("/api/alerts/:studentId", async (req, res) => {
+  try {
+    // FIX: Remove the curly braces around studentId
+    const studentId = req.params.studentId; 
+    
+    const result = await pool.query(
+      "SELECT * FROM alerts WHERE student_id = $1 AND is_resolved = false ORDER BY created_at DESC",
+      [studentId]
+    );
+    res.json(result.rows);
+  } catch (error) {
+    console.error("Error fetching alerts:", error);
+    res.status(500).json({ error: "Internal Server Error"});
+  }
+});
+
+
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {
   console.log(`Server is running on port ${PORT}`);

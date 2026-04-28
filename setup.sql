@@ -29,3 +29,7 @@ INSERT INTO advisors (name, email) VALUES
 INSERT INTO students (name, email, advisor_id, gpa, status) VALUES
 ('Alice Johnson', 'alice.johnson@university.edu', 1, 3.8, 'on-track'),
 ('Jordan Smith', 'jordan.smith@university.edu', 1, 1.9, 'at-risk');;
+ALTER TABLE alerts ADD COLUMN category VARCHAR(50) DEFAULT 'general';
+
+ALTER TABLE alerts 
+ADD COLUMN IF NOT EXISTS category VARCHAR(50) DEFAULT 'general';
