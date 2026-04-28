@@ -1,0 +1,103 @@
+.pathfinder-chat-container {
+  display: flex;
+  flex-direction: column;
+  height: 90vh;
+  max-width: 800px;
+  margin: 20px auto;
+  background: #ffffff;
+  border-radius: 12px;
+  box-shadow: 0 8px 30px rgba(0,0,0,0.12);
+  overflow: hidden;
+}
+
+.pathfinder-chat-window {
+  flex: 1;
+  overflow-y: auto;
+  padding: 25px;
+  background: #f8f9fa;
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+}
+
+.pathfinder-bubble {
+  max-width: 80%;
+  padding: 12px 18px;
+  border-radius: 18px;
+  font-size: 15px;
+  line-height: 1.4;
+}
+
+.pathfinder-bubble.user {
+  align-self: flex-end;
+  background: #204080;
+  color: white;
+  border-bottom-right-radius: 4px;
+}
+
+.pathfinder-bubble.assistant {
+  align-self: flex-start;
+  background: #e9ecef;
+  color: #212529;
+  border-bottom-left-radius: 4px;
+}
+
+.pathfinder-sender {
+  font-size: 11px;
+  font-weight: bold;
+  margin-bottom: 4px;
+  text-transform: uppercase;
+  opacity: 0.8;
+}
+
+.pathfinder-input-form {
+  padding: 20px;
+  background: #fff;
+  border-top: 1px solid #eee;
+}
+
+.pathfinder-controls {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+}
+
+.pathfinder-text-input {
+  flex: 1;
+  padding: 12px 18px;
+  border: 1px solid #dee2e6;
+  border-radius: 25px;
+  outline: none;
+  font-size: 15px;
+}
+
+.pathfinder-text-input:focus {
+  border-color: #204080;
+}
+
+.pathfinder-file-btn {
+  cursor: pointer;
+  font-size: 22px;
+  color: #6c757d;
+  transition: color 0.2s;
+}
+
+.pathfinder-file-btn:hover {
+  color: #204080;
+}
+
+.pathfinder-send-btn {
+  padding: 10px 24px;
+  background: #204080;
+  color: #fff;
+  border: none;
+  border-radius: 25px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: opacity 0.2s;
+}
+
+.pathfinder-send-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}

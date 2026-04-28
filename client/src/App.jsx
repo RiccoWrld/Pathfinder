@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import NotificationArea from './components/NotificationArea';
+import StudentDashboard from './components/StudentDashboard';
 import Signup from './components/SignUp';
 import Login from './components/Login'; 
 import './App.css';
@@ -10,16 +10,18 @@ function App() {
   const [user, setUser] = useState(null);
 
   const handleLogin = (userData) => {
+    // userData contains the id, role, and university_id from your database
     setUser(userData);
     setIsLoggedIn(true);
   };
 
   return (
     <section id="center">
+      {/* Hero background remains consistent across all views */}
       <div className="hero"></div>
 
       {!isLoggedIn ? (
-        <>
+        <div className="auth-wrapper">
           {view === 'login' ? (
             <Login onLoginSuccess={handleLogin} />
           ) : (
@@ -29,9 +31,10 @@ function App() {
           <button className="toggle-auth" onClick={() => setView(view === 'login' ? 'signup' : 'login')}>
             {view === 'login' ? "Need an account? Sign Up" : "Already have an account? Login"}
           </button>
-        </>
+        </div>
       ) : (
-        <NotificationArea studentId={user.id} />
+        /* Replaced <NotificationArea /> with the full Dashboard */
+        <StudentDashboard user={user} />
       )}
     </section>
   );
