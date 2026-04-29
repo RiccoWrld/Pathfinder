@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import './NotificationArea.css';
 
-const NotificationArea = ({ studentId }) => {
+const NotificationArea = ({ studentId, refreshKey = 0 }) => {
   const [alerts, setAlerts] = useState([]);
   const [loading, setLoading] = useState(true);
 
@@ -28,7 +28,7 @@ const NotificationArea = ({ studentId }) => {
     };
 
     fetchAlerts();
-  }, [studentId]);
+  }, [studentId, refreshKey]);
 
   const updateAlert = async (alertId, action) => {
     try {

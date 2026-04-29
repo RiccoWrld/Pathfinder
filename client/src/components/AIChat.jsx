@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import './AIChat.css';
 
-const AIChat = ({ onStudentProfileUpdate }) => {
+const AIChat = ({ user, onStudentProfileUpdate, onAlertsSynced }) => {
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
@@ -35,6 +35,7 @@ const AIChat = ({ onStudentProfileUpdate }) => {
     formData.append("message", currentInput || "Please audit my progress.");
     formData.append("history", JSON.stringify(nextMessages));
     formData.append("auditContext", auditContext);
+    formData.append("studentId", user?.student_id || user?.id || "");
     if (currentFile) formData.append("file", currentFile);
 
     try {
@@ -64,9 +65,21 @@ const AIChat = ({ onStudentProfileUpdate }) => {
           profileUpdate.university_name = data.auditSummary.university_name;
         }
 
+        if (Number.isFinite(data.auditSummary.overall_gpa)) {
+          profileUpdate.gpa = data.auditSummary.overall_gpa;
+        }
+
+        if (data.auditSummary.academic_standing) {
+          profileUpdate.status = data.auditSummary.academic_standing;
+        }
+
         if (Object.keys(profileUpdate).length > 0) {
           onStudentProfileUpdate(profileUpdate);
         }
+      }
+
+      if (data.alertSync?.synced && onAlertsSynced) {
+        onAlertsSynced();
       }
 
       setMessages(prev => [...prev, { role: 'assistant', content: data.reply }]);

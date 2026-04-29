@@ -149,6 +149,17 @@ const extractUniversityFromAudit = (text) => {
   return headerLine || null;
 };
 
+const extractNumberAfter = (text, labels) => {
+  for (const label of labels) {
+    const regex = new RegExp(`${label}[^\\d]{0,40}(\\d+(?:\\.\\d+)?)`, "i");
+    const match = text.match(regex);
+    const value = Number(match?.[1]);
+    if (Number.isFinite(value)) return value;
+  }
+
+  return null;
+};
+
 const extractAuditSummary = (auditText = "") => {
   if (!auditText) return {};
 
@@ -160,11 +171,173 @@ const extractAuditSummary = (auditText = "") => {
       "percent\\s*complete",
       "progress",
     ]) ?? extractCreditCompletion(auditText);
+  const overallGpa = extractNumberAfter(auditText, [
+    "overall\\s*gpa",
+    "cumulative\\s*gpa",
+    "\\bGPA",
+  ]);
+  const standingMatch = auditText.match(/Academic Standing\s+([^\n]+)/i);
+  const academicStanding = standingMatch?.[1]?.trim().replace(/\s{2,}.*/, "") || null;
+  const isGoodStanding =
+    /good standing/i.test(academicStanding || "") ||
+    /you meet the minimum overall 2\.0 gpa/i.test(auditText);
 
   return {
     completion_rate: completionRate,
     university_name: extractUniversityFromAudit(auditText),
+    overall_gpa: overallGpa,
+    academic_standing: academicStanding,
+    is_good_standing: isGoodStanding,
+    has_in_progress: /\bIN-PROGRESS\b|in-progress\s*credits/i.test(auditText),
+    is_nearly_complete: /nearly complete/i.test(auditText),
+    has_unmet_requirements: /still needed|not complete|unmet/i.test(auditText),
   };
+};
+
+const addAuditAlert = async (
+  client,
+  { studentId, advisorId, category, priority, title, message, recommendedAction },
+) => {
+  await client.query(
+    `INSERT INTO alerts (
+       student_id,
+       advisor_id,
+       category,
+       priority,
+       title,
+       message,
+       recommended_action,
+       source
+     )
+     VALUES ($1, $2, $3, $4, $5, $6, $7, 'audit')`,
+    [studentId, advisorId, category, priority, title, message, recommendedAction],
+  );
+};
+
+const syncAuditAlerts = async (studentId, auditSummary) => {
+  const numericStudentId = Number(studentId);
+  if (!Number.isInteger(numericStudentId) || numericStudentId <= 0 || !auditSummary) {
+    return { synced: false, alertsCreated: 0 };
+  }
+
+  const client = await pool.connect();
+
+  try {
+    await client.query("BEGIN");
+
+    const studentResult = await client.query(
+      "SELECT advisor_id FROM students WHERE id = $1",
+      [numericStudentId],
+    );
+
+    if (studentResult.rows.length === 0) {
+      await client.query("ROLLBACK");
+      return { synced: false, alertsCreated: 0 };
+    }
+
+    const advisorId = studentResult.rows[0].advisor_id;
+
+    await client.query(
+      `UPDATE alerts
+       SET is_resolved = true,
+           status = 'resolved',
+           resolved_at = COALESCE(resolved_at, NOW())
+       WHERE student_id = $1
+         AND is_resolved = false
+         AND source = 'audit'`,
+      [numericStudentId],
+    );
+
+    if (auditSummary.is_good_standing && Number(auditSummary.overall_gpa) >= 2) {
+      await client.query(
+        `UPDATE alerts
+         SET is_resolved = true,
+             status = 'resolved',
+             resolved_at = COALESCE(resolved_at, NOW())
+         WHERE student_id = $1
+           AND is_resolved = false
+           AND category = 'academic'
+           AND (
+             title ILIKE '%GPA%'
+             OR message ILIKE '%GPA%'
+             OR message ILIKE '%academic risk%'
+             OR message ILIKE '%good standing%'
+           )`,
+        [numericStudentId],
+      );
+    }
+
+    await client.query(
+      `UPDATE alerts
+       SET is_resolved = true,
+           status = 'resolved',
+           resolved_at = COALESCE(resolved_at, NOW())
+       WHERE student_id = $1
+         AND is_resolved = false
+         AND category = 'degree_requirement'
+         AND COALESCE(source, '') <> 'audit'`,
+      [numericStudentId],
+    );
+
+    if (Number.isFinite(auditSummary.overall_gpa)) {
+      await client.query(
+        `UPDATE students
+         SET gpa = $2,
+             status = $3
+         WHERE id = $1`,
+        [
+          numericStudentId,
+          auditSummary.overall_gpa,
+          auditSummary.is_good_standing ? "good-standing" : "needs-review",
+        ],
+      );
+    }
+
+    let alertsCreated = 0;
+
+    if (!auditSummary.is_good_standing || Number(auditSummary.overall_gpa) < 2) {
+      await addAuditAlert(client, {
+        studentId: numericStudentId,
+        advisorId,
+        category: "academic",
+        priority: "high",
+        title: "Academic Standing Review",
+        message: `Your audit indicates ${auditSummary.academic_standing || "an academic standing concern"}.`,
+        recommendedAction: "Meet with your advisor to review GPA requirements and academic support options.",
+      });
+      alertsCreated++;
+    }
+
+    if (
+      auditSummary.has_unmet_requirements ||
+      auditSummary.has_in_progress ||
+      auditSummary.is_nearly_complete ||
+      (Number.isFinite(auditSummary.completion_rate) && auditSummary.completion_rate < 100)
+    ) {
+      await addAuditAlert(client, {
+        studentId: numericStudentId,
+        advisorId,
+        category: "degree_requirement",
+        priority: "medium",
+        title: auditSummary.is_nearly_complete
+          ? "Nearly Complete: Review In-Progress Requirements"
+          : "Degree Progress Review",
+        message: auditSummary.is_nearly_complete
+          ? "Your DegreeWorks audit indicates you are nearly complete and should review in-progress requirements."
+          : "Your DegreeWorks audit indicates remaining or in-progress degree requirements.",
+        recommendedAction: "Review your DegreeWorks audit with your advisor before finalizing your next schedule.",
+      });
+      alertsCreated++;
+    }
+
+    await client.query("COMMIT");
+    return { synced: true, alertsCreated };
+  } catch (err) {
+    await client.query("ROLLBACK");
+    throw err;
+  } finally {
+    client.release();
+  }
 };
 
 const parseHistory = (rawHistory, currentMessage) => {
@@ -263,14 +436,29 @@ app.post("/api/auth/login", async (req, res) => {
     const user = await pool.query(
       `SELECT
          users.*,
-         universities.name AS university_name,
-         universities.domain AS university_domain
+         students.id AS student_id,
+         students.name AS student_name,
+         students.advisor_id AS student_advisor_id,
+         students.gpa AS student_gpa,
+         students.status AS student_status,
+         COALESCE(user_universities.name, email_universities.name, student_universities.name) AS university_name,
+         COALESCE(user_universities.domain, email_universities.domain, student_universities.domain) AS university_domain
        FROM users
-       LEFT JOIN universities
-         ON universities.id = users.university_id
-         OR LOWER($1) LIKE '%@' || LOWER(universities.domain)
+       LEFT JOIN students
+         ON LOWER(students.email) = LOWER(users.email)
+       LEFT JOIN universities AS user_universities
+         ON user_universities.id = users.university_id
+       LEFT JOIN universities AS email_universities
+         ON LOWER($1) LIKE '%@' || LOWER(email_universities.domain)
+       LEFT JOIN universities AS student_universities
+         ON student_universities.id = students.university_id
        WHERE users.email = $1
-       ORDER BY CASE WHEN universities.id = users.university_id THEN 0 ELSE 1 END
+       ORDER BY CASE
+         WHEN user_universities.id IS NOT NULL THEN 0
+         WHEN student_universities.id IS NOT NULL THEN 1
+         WHEN email_universities.id IS NOT NULL THEN 2
+         ELSE 3
+       END
        LIMIT 1`,
       [email],
     );
@@ -294,6 +482,11 @@ app.post("/api/auth/login", async (req, res) => {
         university_id: user.rows[0].university_id,
         university_name: user.rows[0].university_name,
         university_domain: user.rows[0].university_domain,
+        student_id: user.rows[0].student_id,
+        student_name: user.rows[0].student_name,
+        advisor_id: user.rows[0].student_advisor_id,
+        gpa: user.rows[0].student_gpa,
+        status: user.rows[0].student_status,
       },
     });
   } catch (err) {
@@ -488,11 +681,15 @@ app.post("/api/ai/advisor", upload.single("file"), async (req, res) => {
     const history = parseHistory(req.body.history, message);
 
     let auditContext = normalizeAuditText(req.body.auditContext || "");
+    const uploadedAudit = Boolean(req.file);
     if (req.file) {
       const data = await pdfParse(req.file.buffer);
       auditContext = normalizeAuditText(data.text);
     }
     const auditSummary = extractAuditSummary(auditContext);
+    const alertSync = uploadedAudit
+      ? await syncAuditAlerts(req.body.studentId, auditSummary)
+      : { synced: false, alertsCreated: 0 };
 
     const model = genAI.getGenerativeModel({
       model: _MODEL_NAME,
@@ -571,10 +768,13 @@ app.post("/api/ai/advisor", upload.single("file"), async (req, res) => {
         textResponse = response.text();
         success = true;
       } catch (err) {
-        if (err.status === 429) {
+        if (err.status === 429 || err.status === 503) {
           attempts++;
-          console.log(`Quota hit. Retrying in ${30 * attempts}s...`);
-          await sleep(30000 * attempts);
+          const retryDelaySeconds = err.status === 503 ? 10 * attempts : 30 * attempts;
+          console.log(
+            `Gemini ${err.status} response. Retrying in ${retryDelaySeconds}s...`,
+          );
+          await sleep(retryDelaySeconds * 1000);
         } else {
           throw err;
         }
@@ -582,7 +782,7 @@ app.post("/api/ai/advisor", upload.single("file"), async (req, res) => {
     }
 
     if (!success) throw new Error("API Limit Reached.");
-    res.json({ reply: textResponse, auditContext, auditSummary });
+    res.json({ reply: textResponse, auditContext, auditSummary, alertSync });
   } catch (err) {
     console.error("AI Error:", err);
     res.status(500).json({
