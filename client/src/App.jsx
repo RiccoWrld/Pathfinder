@@ -1,4 +1,5 @@
 import { useState } from "react";
+import AdvisorDashboard from "./components/AdvisorDashboard";
 import StudentDashboard from "./components/StudentDashboard";
 import Signup from "./components/SignUp";
 import Login from "./components/Login";
@@ -45,8 +46,9 @@ function App() {
               : "Already have an account? Login"}
           </button>
         </div>
+      ) : user?.role === "advisor" ? (
+        <AdvisorDashboard user={user} />
       ) : (
-        /* Replaced <NotificationArea /> with the full Dashboard */
         <StudentDashboard
           user={user}
           onStudentProfileUpdate={updateStudentProfile}

@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import './SignUp.css';
 
-const Signup = () => {
+const Signup = ({ onSignupSuccess }) => {
   const [formData, setFormData] = useState({
     email: '',
     password: '',
@@ -30,6 +30,7 @@ const Signup = () => {
       const data = await response.json();
       if (response.ok) {
         setMessage("Signup successful! You can now login.");
+        onSignupSuccess?.();
       } else {
         setMessage(data.error || "Signup failed");
       }
