@@ -5,15 +5,34 @@ import Signup from "./components/SignUp";
 import Login from "./components/Login";
 import "./App.css";
 
+const getStoredUser = () => {
+  try {
+    const storedUser = localStorage.getItem("user");
+    return storedUser ? JSON.parse(storedUser) : null;
+  } catch {
+    localStorage.removeItem("user");
+    return null;
+  }
+};
+
 function App() {
-  const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [user, setUser] = useState(getStoredUser);
+  const [isLoggedIn, setIsLoggedIn] = useState(Boolean(user));
   const [view, setView] = useState("login");
-  const [user, setUser] = useState(null);
 
   const handleLogin = (userData) => {
     // userData contains the id, role, and university_id from your database
     setUser(userData);
+    localStorage.setItem("user", JSON.stringify(userData));
     setIsLoggedIn(true);
+  };
+
+  const handleLogout = () => {
+    localStorage.removeItem("token");
+    localStorage.removeItem("user");
+    setUser(null);
+    setIsLoggedIn(false);
+    setView("login");
   };
 
   const updateStudentProfile = (profileData) => {
@@ -47,11 +66,12 @@ function App() {
           </button>
         </div>
       ) : user?.role === "advisor" ? (
-        <AdvisorDashboard user={user} />
+        <AdvisorDashboard user={user} onLogout={handleLogout} />
       ) : (
         <StudentDashboard
           user={user}
           onStudentProfileUpdate={updateStudentProfile}
+          onLogout={handleLogout}
         />
       )}
     </section>

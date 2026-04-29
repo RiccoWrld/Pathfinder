@@ -3,7 +3,7 @@ import './AdvisorDashboard.css';
 
 const priorityRank = { high: 1, medium: 2, low: 3 };
 
-const AdvisorDashboard = ({ user }) => {
+const AdvisorDashboard = ({ user, onLogout }) => {
   const advisorId = user?.advisor_id || user?.id;
   const [alerts, setAlerts] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -125,9 +125,12 @@ const AdvisorDashboard = ({ user }) => {
           <p>{universityLabel}</p>
         </div>
 
-        <button className="advisor-refresh" onClick={fetchAlerts} disabled={loading}>
-          {loading ? 'Refreshing' : 'Refresh'}
-        </button>
+        <div className="advisor-header-actions">
+          <button className="advisor-refresh" onClick={fetchAlerts} disabled={loading}>
+            {loading ? 'Refreshing' : 'Refresh'}
+          </button>
+          <button className="advisor-logout" onClick={onLogout}>Logout</button>
+        </div>
       </header>
 
       <section className="advisor-stats" aria-label="Advisor alert summary">

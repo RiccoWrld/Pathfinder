@@ -3,7 +3,7 @@ import NotificationArea from './NotificationArea';
 import AIChat from './AIChat';
 import './StudentDashboard.css';
 
-const StudentDashboard = ({ user, onStudentProfileUpdate }) => {
+const StudentDashboard = ({ user, onStudentProfileUpdate, onLogout }) => {
   const [alertsRefreshKey, setAlertsRefreshKey] = useState(0);
   const completionRate = Number.isFinite(user?.completion_rate)
     ? user.completion_rate
@@ -13,11 +13,14 @@ const StudentDashboard = ({ user, onStudentProfileUpdate }) => {
 
   return (
     <div className="dashboard-grid">
+      <button className="dashboard-logout" onClick={onLogout}>Logout</button>
       <div className="left-panel">
         <header className="welcome-banner">
-          <h1>Welcome back, {user?.student_name || "Student"}</h1>
-          {/* Displays the university ID or Name associated with the account */}
-          <p>University Portal: {universityLabel}</p>
+          <div>
+            <h1>Welcome back, {user?.student_name || "Student"}</h1>
+            {/* Displays the university ID or Name associated with the account */}
+            <p>University Portal: {universityLabel}</p>
+          </div>
         </header>
         
         {/* Real-time notification component pulling from your Render DB */}

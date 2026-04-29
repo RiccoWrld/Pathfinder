@@ -36,7 +36,13 @@
   color: #94a3b8;
 }
 
+.advisor-header-actions {
+  display: flex;
+  gap: 10px;
+}
+
 .advisor-refresh,
+.advisor-logout,
 .advisor-alert-actions button {
   border: 1px solid #475569;
   border-radius: 6px;
@@ -48,6 +54,7 @@
 }
 
 .advisor-refresh:hover,
+.advisor-logout:hover,
 .advisor-alert-actions button:hover {
   border-color: #38bdf8;
   color: #7dd3fc;
