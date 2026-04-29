@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import './SignUp.css';
 
 const Signup = () => {
@@ -33,7 +33,7 @@ const Signup = () => {
       } else {
         setMessage(data.error || "Signup failed");
       }
-    } catch (err) {
+    } catch {
       setMessage("Server error. Please try again.");
     }
   };

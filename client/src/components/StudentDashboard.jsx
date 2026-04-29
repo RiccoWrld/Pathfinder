@@ -1,4 +1,3 @@
-import React from 'react';
 import NotificationArea from './NotificationArea';
 import AIChat from './AIChat';
 import './StudentDashboard.css';

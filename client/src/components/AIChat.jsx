@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import './AIChat.css';
 
 const AIChat = () => {
@@ -54,7 +54,7 @@ const AIChat = () => {
       }
 
       setMessages(prev => [...prev, { role: 'assistant', content: data.reply }]);
-    } catch (error) {
+    } catch {
       setMessages(prev => [...prev, { role: 'assistant', content: "Error connecting to advisor." }]);
     } finally {
       setIsLoading(false);
