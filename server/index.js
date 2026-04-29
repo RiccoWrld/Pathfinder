@@ -16,20 +16,25 @@ const pdfParse = require("pdf-parse-fork");
 // --- 1. AI CONFIGURATION ---
 const API_KEY = (process.env.GEMINI_API_KEY || "").trim();
 const genAI = new GoogleGenerativeAI(API_KEY);
-const _MODEL_NAME = "gemini-2.5-flash"; 
+const _MODEL_NAME = "gemini-2.5-flash";
 
 // --- 2. UNIVERSAL ACCURACY PROMPT ---
 const _systemPrompt = () => {
   return `
 ### ROLE
-You are Pathfinder's academic audit advisor. Your job is to answer student questions using only the provided audit text and chat history.
+You are Pathfinder's academic advisor. Your job is to answer student questions with two different modes:
+- For audit-specific questions, use only the provided audit text and chat history.
+- For career exploration, course-planning, and study guidance questions, provide helpful general academic guidance and clearly label it as guidance rather than audit data.
 
 ### GROUNDING RULES
 - Treat the text inside CURRENT STUDENT AUDIT DATA as the source of truth.
-- Do not guess, infer from common degree rules, or invent requirements.
-- If the answer is not clearly supported by the audit text, say: "I cannot locate that specific data in the provided audit."
+- Do not guess, infer from common degree rules, or invent degree requirements.
+- If an audit-specific answer is not clearly supported by the audit text, say: "I cannot locate that specific data in the provided audit."
 - When you answer a factual question, include the exact audit detail that supports it.
 - For course-specific answers, include course codes and grades exactly as they appear.
+- Do not refuse career-path or course-planning questions only because the audit does not name that career path.
+- For career-path questions, use the student's major, completed courses, in-progress courses, missing requirements, and GPA/classification from the audit when relevant. Then add general recommendations for course areas, electives, skills, projects, internships, and advisor questions.
+- If you recommend courses for a career path, prefer exact course codes/titles only when they appear in the audit. Otherwise describe course areas such as web development, databases, software engineering, networks, security, UI/UX, cloud, or internships, and tell the student to confirm local course numbers with their catalog or advisor.
 
 ### UNIVERSAL EXTRACTION RULES (Source of Truth)
 1. **Metadata Identification:** Locate these fields regardless of document position:
@@ -52,6 +57,7 @@ You are Pathfinder's academic audit advisor. Your job is to answer student quest
 - When an audit is first uploaded, state the Classification, GPA, and Major if present.
 - Use **BOLD** for all course codes (e.g., **COSC 458**).
 - Keep answers concise, but include enough evidence that the student can verify the answer.
+- For career guidance, start from what the audit shows, then offer a short practical path. Example: "Your audit shows a Computer Science major. For web development, prioritize course areas like databases, software engineering, web programming, human-computer interaction, networks, and a project or internship. I do not see exact catalog course numbers for all of those areas in the audit, so confirm the local options with your advisor."
 `.trim();
 };
 
@@ -61,7 +67,7 @@ const pool = new Pool({
   ssl: { rejectUnauthorized: false },
 });
 
-const sleep = (ms) => new Promise(res => setTimeout(res, ms));
+const sleep = (ms) => new Promise((res) => setTimeout(res, ms));
 const upload = multer({ storage: multer.memoryStorage() });
 const MAX_AUDIT_CONTEXT_CHARS = 90000;
 const MAX_HISTORY_MESSAGES = 12;
@@ -83,15 +89,20 @@ const parseHistory = (rawHistory, currentMessage) => {
     if (!Array.isArray(parsed)) return [];
 
     const clean = parsed
-      .filter(msg => msg && (msg.role === "user" || msg.role === "assistant"))
-      .map(msg => ({
+      .filter((msg) => msg && (msg.role === "user" || msg.role === "assistant"))
+      .map((msg) => ({
         role: msg.role,
-        content: String(msg.content || "").trim().slice(0, 4000),
+        content: String(msg.content || "")
+          .trim()
+          .slice(0, 4000),
       }))
-      .filter(msg => msg.content);
+      .filter((msg) => msg.content);
 
     const lastMessage = clean[clean.length - 1];
-    if (lastMessage?.role === "user" && lastMessage.content === currentMessage) {
+    if (
+      lastMessage?.role === "user" &&
+      lastMessage.content === currentMessage
+    ) {
       clean.pop();
     }
 
@@ -102,6 +113,18 @@ const parseHistory = (rawHistory, currentMessage) => {
   }
 };
 
+// --- Universities Route ---
+app.get("/api/universities", async (req, res) => {
+  try {
+    const result = await pool.query(
+      "SELECT id, name, domain, branding_color FROM universities ORDER BY name ASC ",
+    );
+    res.json(result.rows);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // --- 4. AUTHENTICATION ROUTES ---
 
 app.post("/api/register", async (req, res) => {
@@ -110,9 +133,11 @@ app.post("/api/register", async (req, res) => {
     const hashedPassword = await bcrypt.hash(password, 10);
     const result = await pool.query(
       "INSERT INTO users (username, password) VALUES ($1, $2) RETURNING id",
-      [username, hashedPassword]
+      [username, hashedPassword],
     );
-    res.status(201).json({ message: "User registered", userId: result.rows[0].id });
+    res
+      .status(201)
+      .json({ message: "User registered", userId: result.rows[0].id });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -121,20 +146,23 @@ app.post("/api/register", async (req, res) => {
 app.post("/api/auth/login", async (req, res) => {
   const { email, password } = req.body;
   try {
-    const user = await pool.query("SELECT * FROM users WHERE email = $1", [email]);
-    if (user.rows.length === 0) return res.status(401).json({ error: "Invalid Credentials" });
+    const user = await pool.query("SELECT * FROM users WHERE email = $1", [
+      email,
+    ]);
+    if (user.rows.length === 0)
+      return res.status(401).json({ error: "Invalid Credentials" });
 
     const isMatch = await bcrypt.compare(password, user.rows[0].password_hash);
     if (!isMatch) return res.status(401).json({ error: "Invalid Credentials" });
 
     const token = jwt.sign(
       { userId: user.rows[0].id, role: user.rows[0].role },
-      process.env.JWT_SECRET || "your_jwt_secret", 
-      { expiresIn: "24h" }
+      process.env.JWT_SECRET || "your_jwt_secret",
+      { expiresIn: "24h" },
     );
     res.json({ token, user: { id: user.rows[0].id, role: user.rows[0].role } });
-  } catch (err) { 
-    res.status(500).json({ error: err.message }); 
+  } catch (err) {
+    res.status(500).json({ error: err.message });
   }
 });
 
@@ -166,7 +194,9 @@ app.post("/api/system/check-alerts", async (req, res) => {
       AND id NOT IN (SELECT student_id FROM alerts WHERE is_resolved = false)
     `);
     res.json({ success: true });
-  } catch (err) { res.status(500).json({ error: err.message }); }
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
 app.get("/api/alerts/:studentId", async (req, res) => {
@@ -187,10 +217,12 @@ app.get("/api/students/:studentId/alerts", async (req, res) => {
            ELSE 4
          END,
          created_at DESC`,
-      [req.params.studentId]
+      [req.params.studentId],
     );
     res.json(result.rows);
-  } catch (error) { res.status(500).json({ error: "Internal Server Error" }); }
+  } catch (error) {
+    res.status(500).json({ error: "Internal Server Error" });
+  }
 });
 
 app.get("/api/advisors/:advisorId/alerts", async (req, res) => {
@@ -213,10 +245,12 @@ app.get("/api/advisors/:advisorId/alerts", async (req, res) => {
            ELSE 4
          END,
          alerts.created_at DESC`,
-      [req.params.advisorId]
+      [req.params.advisorId],
     );
     res.json(result.rows);
-  } catch (error) { res.status(500).json({ error: "Internal Server Error" }); }
+  } catch (error) {
+    res.status(500).json({ error: "Internal Server Error" });
+  }
 });
 
 app.post("/api/alerts", async (req, res) => {
@@ -232,7 +266,9 @@ app.post("/api/alerts", async (req, res) => {
   } = req.body;
 
   if (!student_id || !advisor_id || !message) {
-    return res.status(400).json({ error: "student_id, advisor_id, and message are required" });
+    return res
+      .status(400)
+      .json({ error: "student_id, advisor_id, and message are required" });
   }
 
   try {
@@ -249,7 +285,16 @@ app.post("/api/alerts", async (req, res) => {
        )
        VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
        RETURNING *`,
-      [student_id, advisor_id, category, priority, title, message, recommended_action, source]
+      [
+        student_id,
+        advisor_id,
+        category,
+        priority,
+        title,
+        message,
+        recommended_action,
+        source,
+      ],
     );
     res.status(201).json(result.rows[0]);
   } catch (error) {
@@ -265,7 +310,7 @@ app.patch("/api/alerts/:alertId/acknowledge", async (req, res) => {
            acknowledged_at = COALESCE(acknowledged_at, NOW())
        WHERE id = $1 AND is_resolved = false
        RETURNING *`,
-      [req.params.alertId]
+      [req.params.alertId],
     );
 
     if (result.rows.length === 0) {
@@ -287,7 +332,7 @@ app.patch("/api/alerts/:alertId/resolve", async (req, res) => {
            resolved_at = COALESCE(resolved_at, NOW())
        WHERE id = $1
        RETURNING *`,
-      [req.params.alertId]
+      [req.params.alertId],
     );
 
     if (result.rows.length === 0) {
@@ -323,17 +368,23 @@ app.post("/api/ai/advisor", upload.single("file"), async (req, res) => {
     if (auditContext) {
       contents.push({
         role: "user",
-        parts: [{
-          text: [
-            "CURRENT STUDENT AUDIT DATA:",
-            "Use this audit text as the source of truth for all academic answers.",
-            auditContext,
-          ].join("\n\n"),
-        }],
+        parts: [
+          {
+            text: [
+              "CURRENT STUDENT AUDIT DATA:",
+              "Use this audit text as the source of truth for all academic answers.",
+              auditContext,
+            ].join("\n\n"),
+          },
+        ],
       });
       contents.push({
         role: "model",
-        parts: [{ text: "Audit data received. I will answer only from this audit text and identify missing data when needed." }],
+        parts: [
+          {
+            text: "Audit data received. I will answer only from this audit text and identify missing data when needed.",
+          },
+        ],
       });
     } else {
       contents.push({
@@ -342,27 +393,35 @@ app.post("/api/ai/advisor", upload.single("file"), async (req, res) => {
       });
       contents.push({
         role: "model",
-        parts: [{ text: "I need an audit PDF before I can answer audit-specific questions accurately." }],
+        parts: [
+          {
+            text: "I need an audit PDF before I can answer audit-specific questions accurately.",
+          },
+        ],
       });
     }
 
-    history.forEach(msg => {
+    history.forEach((msg) => {
       contents.push({
         role: msg.role === "assistant" ? "model" : "user",
-        parts: [{ text: msg.content }]
+        parts: [{ text: msg.content }],
       });
     });
 
     contents.push({
       role: "user",
-      parts: [{
-        text: [
-          "Student question:",
-          message,
-          "",
-          "Answer from CURRENT STUDENT AUDIT DATA when possible. If the audit does not support the answer, say you cannot locate it.",
-        ].join("\n"),
-      }],
+      parts: [
+        {
+          text: [
+            "Student question:",
+            message,
+            "",
+            "Answer from CURRENT STUDENT AUDIT DATA when the question asks about this student's audit, requirements, grades, GPA, progress, or completed/in-progress courses.",
+            "If the student asks for career exploration, suggested course areas, skills, projects, internships, or general planning, provide general guidance and use the audit only for available student context.",
+            "Do not invent exact degree requirements or exact course codes that are not shown in the audit.",
+          ].join("\n"),
+        },
+      ],
     });
 
     let attempts = 0;
@@ -376,20 +435,23 @@ app.post("/api/ai/advisor", upload.single("file"), async (req, res) => {
         textResponse = response.text();
         success = true;
       } catch (err) {
-        if (err.status === 429) { 
+        if (err.status === 429) {
           attempts++;
           console.log(`Quota hit. Retrying in ${30 * attempts}s...`);
-          await sleep(30000 * attempts); 
-        } else { throw err; }
+          await sleep(30000 * attempts);
+        } else {
+          throw err;
+        }
       }
     }
 
     if (!success) throw new Error("API Limit Reached.");
     res.json({ reply: textResponse, auditContext });
-
   } catch (err) {
     console.error("AI Error:", err);
-    res.status(500).json({ error: "Advisor is currently busy. Please try again in 30 seconds." });
+    res.status(500).json({
+      error: "Advisor is currently busy. Please try again in 30 seconds.",
+    });
   }
 });
 
