@@ -143,8 +143,25 @@ app.post("/api/auth/login", async (req, res) => {
 app.post("/api/system/check-alerts", async (req, res) => {
   try {
     await pool.query(`
-      INSERT INTO alerts (student_id, advisor_id, message, category)
-      SELECT id, advisor_id, 'Action Required: GPA is currently ' || gpa || '.', 'academic'
+      INSERT INTO alerts (
+        student_id,
+        advisor_id,
+        category,
+        priority,
+        title,
+        message,
+        recommended_action,
+        source
+      )
+      SELECT
+        id,
+        advisor_id,
+        'academic',
+        'high',
+        'GPA Below Good Standing',
+        'Action Required: GPA is currently ' || gpa || '.',
+        'Schedule a meeting with your advisor to review your course load and support options.',
+        'system'
       FROM students WHERE gpa < 2.0
       AND id NOT IN (SELECT student_id FROM alerts WHERE is_resolved = false)
     `);
@@ -153,13 +170,134 @@ app.post("/api/system/check-alerts", async (req, res) => {
 });
 
 app.get("/api/alerts/:studentId", async (req, res) => {
+  res.redirect(307, `/api/students/${req.params.studentId}/alerts`);
+});
+
+app.get("/api/students/:studentId/alerts", async (req, res) => {
   try {
     const result = await pool.query(
-      "SELECT * FROM alerts WHERE student_id = $1 AND is_resolved = false ORDER BY created_at DESC",
+      `SELECT *
+       FROM alerts
+       WHERE student_id = $1 AND is_resolved = false
+       ORDER BY
+         CASE priority
+           WHEN 'high' THEN 1
+           WHEN 'medium' THEN 2
+           WHEN 'low' THEN 3
+           ELSE 4
+         END,
+         created_at DESC`,
       [req.params.studentId]
     );
     res.json(result.rows);
   } catch (error) { res.status(500).json({ error: "Internal Server Error" }); }
+});
+
+app.get("/api/advisors/:advisorId/alerts", async (req, res) => {
+  try {
+    const result = await pool.query(
+      `SELECT
+         alerts.*,
+         students.name AS student_name,
+         students.email AS student_email,
+         students.gpa AS student_gpa,
+         students.status AS student_status
+       FROM alerts
+       JOIN students ON students.id = alerts.student_id
+       WHERE alerts.advisor_id = $1 AND alerts.is_resolved = false
+       ORDER BY
+         CASE alerts.priority
+           WHEN 'high' THEN 1
+           WHEN 'medium' THEN 2
+           WHEN 'low' THEN 3
+           ELSE 4
+         END,
+         alerts.created_at DESC`,
+      [req.params.advisorId]
+    );
+    res.json(result.rows);
+  } catch (error) { res.status(500).json({ error: "Internal Server Error" }); }
+});
+
+app.post("/api/alerts", async (req, res) => {
+  const {
+    student_id,
+    advisor_id,
+    category = "general",
+    priority = "medium",
+    title,
+    message,
+    recommended_action,
+    source = "manual",
+  } = req.body;
+
+  if (!student_id || !advisor_id || !message) {
+    return res.status(400).json({ error: "student_id, advisor_id, and message are required" });
+  }
+
+  try {
+    const result = await pool.query(
+      `INSERT INTO alerts (
+         student_id,
+         advisor_id,
+         category,
+         priority,
+         title,
+         message,
+         recommended_action,
+         source
+       )
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+       RETURNING *`,
+      [student_id, advisor_id, category, priority, title, message, recommended_action, source]
+    );
+    res.status(201).json(result.rows[0]);
+  } catch (error) {
+    res.status(500).json({ error: "Internal Server Error" });
+  }
+});
+
+app.patch("/api/alerts/:alertId/acknowledge", async (req, res) => {
+  try {
+    const result = await pool.query(
+      `UPDATE alerts
+       SET status = 'acknowledged',
+           acknowledged_at = COALESCE(acknowledged_at, NOW())
+       WHERE id = $1 AND is_resolved = false
+       RETURNING *`,
+      [req.params.alertId]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: "Active alert not found" });
+    }
+
+    res.json(result.rows[0]);
+  } catch (error) {
+    res.status(500).json({ error: "Internal Server Error" });
+  }
+});
+
+app.patch("/api/alerts/:alertId/resolve", async (req, res) => {
+  try {
+    const result = await pool.query(
+      `UPDATE alerts
+       SET status = 'resolved',
+           is_resolved = true,
+           resolved_at = COALESCE(resolved_at, NOW())
+       WHERE id = $1
+       RETURNING *`,
+      [req.params.alertId]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: "Alert not found" });
+    }
+
+    res.json(result.rows[0]);
+  } catch (error) {
+    res.status(500).json({ error: "Internal Server Error" });
+  }
 });
 
 // --- 6. AI ADVISOR ROUTE (CORE LOGIC) ---
