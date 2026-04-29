@@ -77,6 +77,11 @@ const AIChat = ({ user, onStudentProfileUpdate, onAlertsSynced }) => {
           profileUpdate.last_audit_uploaded_at = new Date().toISOString();
         }
 
+        if (data.alertSync?.advisorMatched) {
+          profileUpdate.advisor_id = data.alertSync.advisorId;
+          profileUpdate.advisor_name = data.alertSync.advisorName;
+        }
+
         if (Object.keys(profileUpdate).length > 0) {
           onStudentProfileUpdate(profileUpdate);
         }

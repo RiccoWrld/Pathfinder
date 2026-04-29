@@ -149,6 +149,57 @@ const extractUniversityFromAudit = (text) => {
   return headerLine || null;
 };
 
+const cleanAuditLineValue = (value = "") => {
+  return value
+    .replace(/\s{2,}.*/, "")
+    .replace(/\b(email|phone|office|campus|advisor)\b.*$/i, "")
+    .trim();
+};
+
+const normalizePersonName = (name = "") => {
+  return name
+    .toLowerCase()
+    .replace(/[^a-z\s]/g, " ")
+    .replace(/\b(dr|prof|professor|mr|mrs|ms)\b/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+};
+
+const extractAdvisorFromAudit = (text = "") => {
+  const advisorLine = text
+    .split("\n")
+    .map((line) => line.trim())
+    .find((line) => /\badvisor\b/i.test(line) && line.length <= 160);
+  const advisorEmail = advisorLine?.match(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/i)?.[0] || null;
+
+  const advisorPatterns = [
+    /(?:primary\s+)?(?:academic\s+)?advisor(?:\s+name)?\s*[:\-]\s*([^\n]+)/i,
+    /(?:assigned\s+advisor|faculty\s+advisor|major\s+advisor)\s*[:\-]\s*([^\n]+)/i,
+  ];
+
+  for (const pattern of advisorPatterns) {
+    const match = text.match(pattern);
+    const advisorName = cleanAuditLineValue(match?.[1]);
+
+    if (advisorName) {
+      return { advisor_name: advisorName, advisor_email: advisorEmail };
+    }
+  }
+
+  if (advisorLine) {
+    const withoutEmail = advisorLine.replace(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/i, "");
+    const advisorName = cleanAuditLineValue(
+      withoutEmail.replace(/.*?\badvisor(?:\s+name)?\b\s*[:\-]?\s*/i, ""),
+    );
+
+    if (advisorName && !/^advisor$/i.test(advisorName)) {
+      return { advisor_name: advisorName, advisor_email: advisorEmail };
+    }
+  }
+
+  return { advisor_name: null, advisor_email: advisorEmail };
+};
+
 const extractNumberAfter = (text, labels) => {
   for (const label of labels) {
     const regex = new RegExp(`${label}[^\\d]{0,40}(\\d+(?:\\.\\d+)?)`, "i");
@@ -185,6 +236,7 @@ const extractAuditSummary = (auditText = "") => {
   return {
     completion_rate: completionRate,
     university_name: extractUniversityFromAudit(auditText),
+    ...extractAdvisorFromAudit(auditText),
     overall_gpa: overallGpa,
     academic_standing: academicStanding,
     is_good_standing: isGoodStanding,
@@ -192,6 +244,40 @@ const extractAuditSummary = (auditText = "") => {
     is_nearly_complete: /nearly complete/i.test(auditText),
     has_unmet_requirements: /still needed|not complete|unmet/i.test(auditText),
   };
+};
+
+const matchAdvisorFromAudit = async (client, auditSummary, universityId) => {
+  const advisorEmail = auditSummary?.advisor_email;
+  const advisorName = normalizePersonName(auditSummary?.advisor_name);
+
+  if (advisorEmail) {
+    const emailResult = await client.query(
+      `SELECT id, name, email
+       FROM advisors
+       WHERE LOWER(email) = LOWER($1)
+       LIMIT 1`,
+      [advisorEmail],
+    );
+
+    if (emailResult.rows.length > 0) {
+      return emailResult.rows[0];
+    }
+  }
+
+  if (!advisorName) return null;
+
+  const advisorResult = await client.query(
+    `SELECT id, name, email
+     FROM advisors
+     WHERE ($1::int IS NULL OR university_id = $1)
+     ORDER BY id`,
+    [universityId],
+  );
+
+  return advisorResult.rows.find((advisor) => {
+    const candidateName = normalizePersonName(advisor.name);
+    return candidateName === advisorName || candidateName.includes(advisorName) || advisorName.includes(candidateName);
+  }) || null;
 };
 
 const addAuditAlert = async (
@@ -226,7 +312,7 @@ const syncAuditAlerts = async (studentId, auditSummary) => {
     await client.query("BEGIN");
 
     const studentResult = await client.query(
-      "SELECT advisor_id FROM students WHERE id = $1",
+      "SELECT advisor_id, university_id FROM students WHERE id = $1",
       [numericStudentId],
     );
 
@@ -235,7 +321,22 @@ const syncAuditAlerts = async (studentId, auditSummary) => {
       return { synced: false, alertsCreated: 0 };
     }
 
-    const advisorId = studentResult.rows[0].advisor_id;
+    const matchedAdvisor = await matchAdvisorFromAudit(
+      client,
+      auditSummary,
+      studentResult.rows[0].university_id,
+    );
+    const advisorId = matchedAdvisor?.id || studentResult.rows[0].advisor_id;
+
+    if (matchedAdvisor) {
+      await client.query(
+        `UPDATE alerts
+         SET advisor_id = $2
+         WHERE student_id = $1
+           AND is_resolved = false`,
+        [numericStudentId, advisorId],
+      );
+    }
 
     await client.query(
       `UPDATE alerts
@@ -286,6 +387,7 @@ const syncAuditAlerts = async (studentId, auditSummary) => {
            completion_rate = COALESCE($4, completion_rate),
            academic_standing = COALESCE($5, academic_standing),
            audit_university_name = COALESCE($6, audit_university_name),
+           advisor_id = COALESCE($7, advisor_id),
            last_audit_uploaded_at = NOW()
        WHERE id = $1`,
       [
@@ -297,6 +399,7 @@ const syncAuditAlerts = async (studentId, auditSummary) => {
           : null,
         auditSummary.academic_standing,
         auditSummary.university_name,
+        matchedAdvisor?.id || null,
       ],
     );
 
@@ -338,7 +441,13 @@ const syncAuditAlerts = async (studentId, auditSummary) => {
     }
 
     await client.query("COMMIT");
-    return { synced: true, alertsCreated };
+    return {
+      synced: true,
+      alertsCreated,
+      advisorMatched: Boolean(matchedAdvisor),
+      advisorId,
+      advisorName: matchedAdvisor?.name || null,
+    };
   } catch (err) {
     await client.query("ROLLBACK");
     throw err;
@@ -410,9 +519,10 @@ app.post("/api/register", async (req, res) => {
 });
 
 app.post("/api/auth/signup", async (req, res) => {
-  const { email, password, role = "student", university_id } = req.body;
+  const { email, password, role = "student", university_id, name } = req.body;
   const normalizedEmail = String(email || "").trim().toLowerCase();
   const normalizedRole = String(role || "student").trim().toLowerCase();
+  const normalizedName = String(name || "").trim();
 
   if (!normalizedEmail || !password || !university_id) {
     return res
@@ -438,10 +548,12 @@ app.post("/api/auth/signup", async (req, res) => {
     );
 
     const user = userResult.rows[0];
-    const profileName = normalizedEmail
-      .split("@")[0]
-      .replace(/[._-]+/g, " ")
-      .replace(/\b\w/g, (char) => char.toUpperCase());
+    const profileName =
+      normalizedName ||
+      normalizedEmail
+        .split("@")[0]
+        .replace(/[._-]+/g, " ")
+        .replace(/\b\w/g, (char) => char.toUpperCase());
     let studentId = null;
     let advisorId = null;
 

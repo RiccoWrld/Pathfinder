@@ -3,6 +3,7 @@ import './SignUp.css';
 
 const Signup = ({ onSignupSuccess }) => {
   const [formData, setFormData] = useState({
+    name: '',
     email: '',
     password: '',
     role: 'student',
@@ -43,27 +44,36 @@ const Signup = ({ onSignupSuccess }) => {
     <div className="auth-container">
       <h2>Create your Pathfinder Account</h2>
       <form onSubmit={handleSubmit}>
+        <input
+          type="text"
+          placeholder={formData.role === 'advisor' ? 'Full Name as shown in DegreeWorks' : 'Full Name'}
+          required
+          value={formData.name}
+          onChange={(e) => setFormData({...formData, name: e.target.value})}
+        />
         <input 
           type="email" 
           placeholder="University Email" 
           required 
+          value={formData.email}
           onChange={(e) => setFormData({...formData, email: e.target.value})}
         />
         <input 
           type="password" 
           placeholder="Password" 
           required 
+          value={formData.password}
           onChange={(e) => setFormData({...formData, password: e.target.value})}
         />
         
         <label>I am a:</label>
-        <select onChange={(e) => setFormData({...formData, role: e.target.value})}>
+        <select value={formData.role} onChange={(e) => setFormData({...formData, role: e.target.value})}>
           <option value="student">Student</option>
           <option value="advisor">Advisor</option>
         </select>
 
         <label>Select University:</label>
-        <select required onChange={(e) => setFormData({...formData, university_id: e.target.value})}>
+        <select required value={formData.university_id} onChange={(e) => setFormData({...formData, university_id: e.target.value})}>
           <option value="">-- Choose School --</option>
           {universities.map(u => (
             <option key={u.id} value={u.id}>{u.name}</option>
