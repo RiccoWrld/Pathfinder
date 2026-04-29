@@ -73,6 +73,10 @@ const AIChat = ({ user, onStudentProfileUpdate, onAlertsSynced }) => {
           profileUpdate.status = data.auditSummary.academic_standing;
         }
 
+        if (data.alertSync?.synced) {
+          profileUpdate.last_audit_uploaded_at = new Date().toISOString();
+        }
+
         if (Object.keys(profileUpdate).length > 0) {
           onStudentProfileUpdate(profileUpdate);
         }

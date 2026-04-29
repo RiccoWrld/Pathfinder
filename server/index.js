@@ -279,19 +279,26 @@ const syncAuditAlerts = async (studentId, auditSummary) => {
       [numericStudentId],
     );
 
-    if (Number.isFinite(auditSummary.overall_gpa)) {
-      await client.query(
-        `UPDATE students
-         SET gpa = $2,
-             status = $3
-         WHERE id = $1`,
-        [
-          numericStudentId,
-          auditSummary.overall_gpa,
-          auditSummary.is_good_standing ? "good-standing" : "needs-review",
-        ],
-      );
-    }
+    await client.query(
+      `UPDATE students
+       SET gpa = COALESCE($2, gpa),
+           status = $3,
+           completion_rate = COALESCE($4, completion_rate),
+           academic_standing = COALESCE($5, academic_standing),
+           audit_university_name = COALESCE($6, audit_university_name),
+           last_audit_uploaded_at = NOW()
+       WHERE id = $1`,
+      [
+        numericStudentId,
+        Number.isFinite(auditSummary.overall_gpa) ? auditSummary.overall_gpa : null,
+        auditSummary.is_good_standing ? "good-standing" : "needs-review",
+        Number.isFinite(auditSummary.completion_rate)
+          ? auditSummary.completion_rate
+          : null,
+        auditSummary.academic_standing,
+        auditSummary.university_name,
+      ],
+    );
 
     let alertsCreated = 0;
 
@@ -441,7 +448,10 @@ app.post("/api/auth/login", async (req, res) => {
          students.advisor_id AS student_advisor_id,
          students.gpa AS student_gpa,
          students.status AS student_status,
-         COALESCE(user_universities.name, email_universities.name, student_universities.name) AS university_name,
+         students.completion_rate AS student_completion_rate,
+         students.academic_standing AS student_academic_standing,
+         students.last_audit_uploaded_at AS student_last_audit_uploaded_at,
+         COALESCE(students.audit_university_name, user_universities.name, email_universities.name, student_universities.name) AS university_name,
          COALESCE(user_universities.domain, email_universities.domain, student_universities.domain) AS university_domain
        FROM users
        LEFT JOIN students
@@ -486,7 +496,10 @@ app.post("/api/auth/login", async (req, res) => {
         student_name: user.rows[0].student_name,
         advisor_id: user.rows[0].student_advisor_id,
         gpa: user.rows[0].student_gpa,
-        status: user.rows[0].student_status,
+        status:
+          user.rows[0].student_academic_standing || user.rows[0].student_status,
+        completion_rate: user.rows[0].student_completion_rate,
+        last_audit_uploaded_at: user.rows[0].student_last_audit_uploaded_at,
       },
     });
   } catch (err) {
