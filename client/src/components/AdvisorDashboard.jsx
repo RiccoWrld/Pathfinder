@@ -6,33 +6,48 @@ const priorityRank = { high: 1, medium: 2, low: 3 };
 const AdvisorDashboard = ({ user, onLogout }) => {
   const advisorId = user?.advisor_id || user?.id;
   const [alerts, setAlerts] = useState([]);
+  const [students, setStudents] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
-  const requestAlerts = useCallback(async () => {
+  const requestDashboardData = useCallback(async () => {
     if (!advisorId) {
-      return [];
+      return { alerts: [], students: [] };
     }
 
-    const response = await fetch(`http://localhost:5000/api/advisors/${advisorId}/alerts`);
-    const data = await response.json();
+    const [alertsResponse, studentsResponse] = await Promise.all([
+      fetch(`http://localhost:5000/api/advisors/${advisorId}/alerts`),
+      fetch(`http://localhost:5000/api/advisors/${advisorId}/students`),
+    ]);
+    const [alertsData, studentsData] = await Promise.all([
+      alertsResponse.json(),
+      studentsResponse.json(),
+    ]);
 
-    if (!response.ok) {
-      throw new Error(data.error || 'Could not load advisor alerts');
+    if (!alertsResponse.ok) {
+      throw new Error(alertsData.error || 'Could not load advisor alerts');
     }
 
-    return Array.isArray(data) ? data : [];
+    if (!studentsResponse.ok) {
+      throw new Error(studentsData.error || 'Could not load advisor roster');
+    }
+
+    return {
+      alerts: Array.isArray(alertsData) ? alertsData : [],
+      students: Array.isArray(studentsData) ? studentsData : [],
+    };
   }, [advisorId]);
 
-  const fetchAlerts = async () => {
+  const fetchDashboardData = async () => {
     setLoading(true);
     setError('');
 
     try {
-      const nextAlerts = await requestAlerts();
-      setAlerts(nextAlerts);
+      const nextData = await requestDashboardData();
+      setAlerts(nextData.alerts);
+      setStudents(nextData.students);
     } catch {
-      setError('Could not load advisor alerts.');
+      setError('Could not load advisor dashboard.');
     } finally {
       setLoading(false);
     }
@@ -43,15 +58,16 @@ const AdvisorDashboard = ({ user, onLogout }) => {
 
     const loadInitialAlerts = async () => {
       try {
-        const nextAlerts = await requestAlerts();
+        const nextData = await requestDashboardData();
 
         if (isCurrent) {
-          setAlerts(nextAlerts);
+          setAlerts(nextData.alerts);
+          setStudents(nextData.students);
           setError('');
         }
       } catch {
         if (isCurrent) {
-          setError('Could not load advisor alerts.');
+          setError('Could not load advisor dashboard.');
         }
       } finally {
         if (isCurrent) {
@@ -65,7 +81,7 @@ const AdvisorDashboard = ({ user, onLogout }) => {
     return () => {
       isCurrent = false;
     };
-  }, [requestAlerts]);
+  }, [requestDashboardData]);
 
   const updateAlert = async (alertId, action) => {
     try {
@@ -91,17 +107,16 @@ const AdvisorDashboard = ({ user, onLogout }) => {
   };
 
   const stats = useMemo(() => {
-    const studentIds = new Set(alerts.map(alert => alert.student_id).filter(Boolean));
     const highPriority = alerts.filter(alert => alert.priority === 'high').length;
     const acknowledged = alerts.filter(alert => alert.status === 'acknowledged').length;
 
     return {
       activeAlerts: alerts.length,
-      studentsFlagged: studentIds.size,
+      studentsFlagged: students.length,
       highPriority,
       acknowledged,
     };
-  }, [alerts]);
+  }, [alerts, students]);
 
   const sortedAlerts = useMemo(() => {
     return [...alerts].sort((a, b) => {
@@ -126,7 +141,7 @@ const AdvisorDashboard = ({ user, onLogout }) => {
         </div>
 
         <div className="advisor-header-actions">
-          <button className="advisor-refresh" onClick={fetchAlerts} disabled={loading}>
+          <button className="advisor-refresh" onClick={fetchDashboardData} disabled={loading}>
             {loading ? 'Refreshing' : 'Refresh'}
           </button>
           <button className="advisor-logout" onClick={onLogout}>Logout</button>
@@ -140,7 +155,7 @@ const AdvisorDashboard = ({ user, onLogout }) => {
         </div>
         <div>
           <span>{stats.studentsFlagged}</span>
-          <p>Students Flagged</p>
+          <p>Assigned Students</p>
         </div>
         <div>
           <span>{stats.highPriority}</span>
@@ -150,6 +165,37 @@ const AdvisorDashboard = ({ user, onLogout }) => {
           <span>{stats.acknowledged}</span>
           <p>Acknowledged</p>
         </div>
+      </section>
+
+      <section className="advisor-roster">
+        <div className="advisor-section-heading">
+          <h2>Student Roster</h2>
+          <p>All students currently assigned to you.</p>
+        </div>
+
+        {loading ? (
+          <p className="advisor-empty">Loading student roster...</p>
+        ) : students.length > 0 ? (
+          <div className="advisor-roster-list">
+            {students.map(student => (
+              <article key={student.id} className="advisor-student-card">
+                <div>
+                  <h3>{student.name || 'Student'}</h3>
+                  <p>{student.email}</p>
+                </div>
+                <div className="advisor-roster-metrics">
+                  <span>GPA {student.gpa ?? 'N/A'}</span>
+                  <span>{student.academic_standing || student.status || 'status pending'}</span>
+                  <span>{student.completion_rate ?? 'No'}% complete</span>
+                  <span>{student.active_alert_count || 0} active alerts</span>
+                  <span>{student.high_priority_alert_count || 0} high priority</span>
+                </div>
+              </article>
+            ))}
+          </div>
+        ) : (
+          <p className="advisor-empty">No students are assigned to you yet.</p>
+        )}
       </section>
 
       <section className="advisor-alerts">

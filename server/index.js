@@ -775,6 +775,42 @@ app.get("/api/advisors/:advisorId/alerts", async (req, res) => {
   }
 });
 
+app.get("/api/advisors/:advisorId/students", async (req, res) => {
+  try {
+    const result = await pool.query(
+      `SELECT
+         students.id,
+         students.name,
+         students.email,
+         students.gpa,
+         students.status,
+         students.completion_rate,
+         students.academic_standing,
+         students.last_audit_uploaded_at,
+         students.audit_university_name,
+         COUNT(alerts.id) FILTER (WHERE alerts.is_resolved = false) AS active_alert_count,
+         COUNT(alerts.id) FILTER (
+           WHERE alerts.is_resolved = false AND alerts.priority = 'high'
+         ) AS high_priority_alert_count
+       FROM students
+       LEFT JOIN alerts
+         ON alerts.student_id = students.id
+       WHERE students.advisor_id = $1
+       GROUP BY students.id
+       ORDER BY
+         COUNT(alerts.id) FILTER (
+           WHERE alerts.is_resolved = false AND alerts.priority = 'high'
+         ) DESC,
+         COUNT(alerts.id) FILTER (WHERE alerts.is_resolved = false) DESC,
+         students.name ASC`,
+      [req.params.advisorId],
+    );
+    res.json(result.rows);
+  } catch (error) {
+    res.status(500).json({ error: "Internal Server Error" });
+  }
+});
+
 app.post("/api/alerts", async (req, res) => {
   const {
     student_id,
