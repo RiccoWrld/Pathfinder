@@ -11,42 +11,111 @@ const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
 const { GoogleGenerativeAI } = require("@google/generative-ai");
 const multer = require("multer");
-const { PDFDocument } = require("pdf-lib");
-const pdfParse = require("pdf-parse-fork"); // For reading text inside PDFs
+const pdfParse = require("pdf-parse-fork");
 
-// --- 1. AI CLIENT CONFIGURATION ---
-
+// --- 1. AI CONFIGURATION ---
 const API_KEY = (process.env.GEMINI_API_KEY || "").trim();
 const genAI = new GoogleGenerativeAI(API_KEY);
-
-// Latest stable production model per your documentation
 const _MODEL_NAME = "gemini-2.5-flash"; 
 
+// --- 2. UNIVERSAL ACCURACY PROMPT ---
 const _systemPrompt = () => {
-  return (
-    "You are a University Faculty Advisor. Your goal is to help students graduate on time. " +
-    "Use the provided student document data (transcripts, audits) to give accurate guidance. " +
-    "Be professional, encouraging, and if you are unsure of specific data, suggest contacting the department office."
-  );
+  return `
+### ROLE
+You are Pathfinder's academic audit advisor. Your job is to answer student questions using only the provided audit text and chat history.
+
+### GROUNDING RULES
+- Treat the text inside CURRENT STUDENT AUDIT DATA as the source of truth.
+- Do not guess, infer from common degree rules, or invent requirements.
+- If the answer is not clearly supported by the audit text, say: "I cannot locate that specific data in the provided audit."
+- When you answer a factual question, include the exact audit detail that supports it.
+- For course-specific answers, include course codes and grades exactly as they appear.
+
+### UNIVERSAL EXTRACTION RULES (Source of Truth)
+1. **Metadata Identification:** Locate these fields regardless of document position:
+   - "Classification" or "Level": Determine if Student is Freshman, Sophomore, Junior, or Senior.
+   - "GPA": Extract "Overall GPA" or "Cumulative GPA". (e.g., 3.579).
+   - "Major": Identify the primary field of study.
+
+2. **Tabular Data Parsing:** DegreeWorks uses a "Course / Title / Grade / Credits / Term" structure.
+   - When asked for specific grades (e.g., "Courses I got a C in"), scan the "Grade" column ONLY. 
+   - Verify the grade is an exact match to avoid confusing course titles (like "Calculus") with grades.
+
+3. **Status Symbol Legend:**
+   - **IP / REG / ( )**: In-Progress. These are CURRENT courses the student is taking NOW.
+   - **Complete / [✔] / (MET)**: Requirements already satisfied.
+   - **Still Needed / [ ]**: Missing requirements.
+
+4. **In-Progress Logic:** Locate the "In-progress" section (usually at the end). List these as the student's current schedule.
+
+### RESPONSE PROTOCOL
+- When an audit is first uploaded, state the Classification, GPA, and Major if present.
+- Use **BOLD** for all course codes (e.g., **COSC 458**).
+- Keep answers concise, but include enough evidence that the student can verify the answer.
+`.trim();
 };
 
-// Database Connection
+// --- 3. DATABASE CONNECTION ---
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
   ssl: { rejectUnauthorized: false },
 });
 
 const sleep = (ms) => new Promise(res => setTimeout(res, ms));
+const upload = multer({ storage: multer.memoryStorage() });
+const MAX_AUDIT_CONTEXT_CHARS = 90000;
+const MAX_HISTORY_MESSAGES = 12;
 
-// --- 2. CORE & AUTHENTICATION ROUTES ---
+const normalizeAuditText = (text = "") => {
+  return text
+    .replace(/\r/g, "\n")
+    .replace(/[ \t]+/g, " ")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim()
+    .slice(0, MAX_AUDIT_CONTEXT_CHARS);
+};
 
-app.get("/", (req, res) => res.send("Pathfinder Universal Server Operational"));
+const parseHistory = (rawHistory, currentMessage) => {
+  if (!rawHistory) return [];
 
-app.get("/db-test", async (req, res) => {
   try {
-    const result = await pool.query("SELECT NOW()");
-    res.json({ success: true, timestamp: result.rows[0].now });
-  } catch (err) { res.status(500).json({ success: false, error: err.message }); }
+    const parsed = JSON.parse(rawHistory);
+    if (!Array.isArray(parsed)) return [];
+
+    const clean = parsed
+      .filter(msg => msg && (msg.role === "user" || msg.role === "assistant"))
+      .map(msg => ({
+        role: msg.role,
+        content: String(msg.content || "").trim().slice(0, 4000),
+      }))
+      .filter(msg => msg.content);
+
+    const lastMessage = clean[clean.length - 1];
+    if (lastMessage?.role === "user" && lastMessage.content === currentMessage) {
+      clean.pop();
+    }
+
+    return clean.slice(-MAX_HISTORY_MESSAGES);
+  } catch (err) {
+    console.error("Invalid chat history:", err);
+    return [];
+  }
+};
+
+// --- 4. AUTHENTICATION ROUTES ---
+
+app.post("/api/register", async (req, res) => {
+  const { username, password } = req.body;
+  try {
+    const hashedPassword = await bcrypt.hash(password, 10);
+    const result = await pool.query(
+      "INSERT INTO users (username, password) VALUES ($1, $2) RETURNING id",
+      [username, hashedPassword]
+    );
+    res.status(201).json({ message: "User registered", userId: result.rows[0].id });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
 app.post("/api/auth/login", async (req, res) => {
@@ -60,13 +129,16 @@ app.post("/api/auth/login", async (req, res) => {
 
     const token = jwt.sign(
       { userId: user.rows[0].id, role: user.rows[0].role },
-      process.env.JWT_SECRET || "your_jwt_secret", { expiresIn: "24h" }
+      process.env.JWT_SECRET || "your_jwt_secret", 
+      { expiresIn: "24h" }
     );
     res.json({ token, user: { id: user.rows[0].id, role: user.rows[0].role } });
-  } catch (err) { res.status(500).json({ error: err.message }); }
+  } catch (err) { 
+    res.status(500).json({ error: err.message }); 
+  }
 });
 
-// --- 3. ACADEMIC ALERT ROUTES ---
+// --- 5. SYSTEM & ALERT ROUTES ---
 
 app.post("/api/system/check-alerts", async (req, res) => {
   try {
@@ -90,34 +162,52 @@ app.get("/api/alerts/:studentId", async (req, res) => {
   } catch (error) { res.status(500).json({ error: "Internal Server Error" }); }
 });
 
-// --- 4. AI ADVISOR ROUTE (TEXT EXTRACTION + 2.5 FLASH) ---
-
-const upload = multer({ storage: multer.memoryStorage() });
+// --- 6. AI ADVISOR ROUTE (CORE LOGIC) ---
 
 app.post("/api/ai/advisor", upload.single("file"), async (req, res) => {
-  const { message, history = [] } = req.body;
-  let pdfTextContext = "";
-
   try {
+    const message = String(req.body.message || "Analyze my standing.").trim();
+    const history = parseHistory(req.body.history, message);
+
+    let auditContext = normalizeAuditText(req.body.auditContext || "");
     if (req.file) {
-      // Extract text so the AI can actually "see" the data
       const data = await pdfParse(req.file.buffer);
-      pdfTextContext = `\n[EXTRACTED TEXT FROM STUDENT DOCUMENT]:\n${data.text}`;
+      auditContext = normalizeAuditText(data.text);
     }
 
-    const model = genAI.getGenerativeModel({ model: _MODEL_NAME });
+    const model = genAI.getGenerativeModel({
+      model: _MODEL_NAME,
+      systemInstruction: _systemPrompt(),
+    });
 
-    // Build contents structure (Python-style logic)
-    const contents = [{ role: "user", parts: [{ text: _systemPrompt() }] }];
+    const contents = [];
 
-    if (pdfTextContext) {
+    if (auditContext) {
       contents.push({
         role: "user",
-        parts: [{ text: "Context from student file:" + pdfTextContext }]
+        parts: [{
+          text: [
+            "CURRENT STUDENT AUDIT DATA:",
+            "Use this audit text as the source of truth for all academic answers.",
+            auditContext,
+          ].join("\n\n"),
+        }],
+      });
+      contents.push({
+        role: "model",
+        parts: [{ text: "Audit data received. I will answer only from this audit text and identify missing data when needed." }],
+      });
+    } else {
+      contents.push({
+        role: "user",
+        parts: [{ text: "No audit has been uploaded yet." }],
+      });
+      contents.push({
+        role: "model",
+        parts: [{ text: "I need an audit PDF before I can answer audit-specific questions accurately." }],
       });
     }
 
-    // Add conversation history
     history.forEach(msg => {
       contents.push({
         role: msg.role === "assistant" ? "model" : "user",
@@ -125,7 +215,17 @@ app.post("/api/ai/advisor", upload.single("file"), async (req, res) => {
       });
     });
 
-    contents.push({ role: "user", parts: [{ text: message }] });
+    contents.push({
+      role: "user",
+      parts: [{
+        text: [
+          "Student question:",
+          message,
+          "",
+          "Answer from CURRENT STUDENT AUDIT DATA when possible. If the audit does not support the answer, say you cannot locate it.",
+        ].join("\n"),
+      }],
+    });
 
     let attempts = 0;
     let success = false;
@@ -138,22 +238,20 @@ app.post("/api/ai/advisor", upload.single("file"), async (req, res) => {
         textResponse = response.text();
         success = true;
       } catch (err) {
-        if (err.status === 429) { // Fixes Quota issues
+        if (err.status === 429) { 
           attempts++;
-          await sleep(2000 * attempts);
+          console.log(`Quota hit. Retrying in ${30 * attempts}s...`);
+          await sleep(30000 * attempts); 
         } else { throw err; }
       }
     }
 
-    if (!success) throw new Error("Processing failed.");
-    res.json({ reply: textResponse });
+    if (!success) throw new Error("API Limit Reached.");
+    res.json({ reply: textResponse, auditContext });
 
   } catch (err) {
     console.error("AI Error:", err);
-    res.status(500).json({ 
-      error: "I'm sorry, I'm having trouble processing that request. Please try again or contact your advisor.",
-      details: err.message 
-    });
+    res.status(500).json({ error: "Advisor is currently busy. Please try again in 30 seconds." });
   }
 });
 
