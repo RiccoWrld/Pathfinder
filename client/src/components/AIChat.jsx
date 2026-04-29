@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import './AIChat.css';
 
-const AIChat = () => {
+const AIChat = ({ onStudentProfileUpdate }) => {
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
@@ -51,6 +51,22 @@ const AIChat = () => {
       if (data.auditContext) {
         setAuditContext(data.auditContext);
         setHasAudit(true);
+      }
+
+      if (data.auditSummary && onStudentProfileUpdate) {
+        const profileUpdate = {};
+
+        if (Number.isFinite(data.auditSummary.completion_rate)) {
+          profileUpdate.completion_rate = data.auditSummary.completion_rate;
+        }
+
+        if (data.auditSummary.university_name) {
+          profileUpdate.university_name = data.auditSummary.university_name;
+        }
+
+        if (Object.keys(profileUpdate).length > 0) {
+          onStudentProfileUpdate(profileUpdate);
+        }
       }
 
       setMessages(prev => [...prev, { role: 'assistant', content: data.reply }]);

@@ -2,10 +2,11 @@ import NotificationArea from './NotificationArea';
 import AIChat from './AIChat';
 import './StudentDashboard.css';
 
-const StudentDashboard = ({ user }) => {
-  // FIXED: Defined completionRate so the progress bar works.
-  // This uses a fallback of 75% if no specific data is found in the user object.
-  const completionRate = user?.completion_rate || 75; 
+const StudentDashboard = ({ user, onStudentProfileUpdate }) => {
+  const completionRate = Number.isFinite(user?.completion_rate)
+    ? user.completion_rate
+    : null;
+  const universityLabel = user?.university_name || user?.university_domain || "Upload DegreeWorks to detect school";
 
   return (
     <div className="dashboard-grid">
@@ -13,7 +14,7 @@ const StudentDashboard = ({ user }) => {
         <header className="welcome-banner">
           <h1>Welcome back, Student</h1>
           {/* Displays the university ID or Name associated with the account */}
-          <p>University Portal: {user?.university_name || `Institution #${user?.university_id}`}</p>
+          <p>University Portal: {universityLabel}</p>
         </header>
         
         {/* Real-time notification component pulling from your Render DB */}
@@ -21,13 +22,16 @@ const StudentDashboard = ({ user }) => {
         
         <div className="degree-progress">
           <h3>Degree Completion</h3>
+          {completionRate === null && (
+            <p className="progress-note">Upload a DegreeWorks audit to calculate your progress.</p>
+          )}
           <div className="progress-bar-container">
             {/* The width now updates dynamically based on the completionRate variable */}
             <div 
-              className="progress-fill" 
-              style={{ width: `${completionRate}%` }}
+              className={`progress-fill ${completionRate === null ? 'pending' : ''}`}
+              style={{ width: `${completionRate ?? 100}%` }}
             >
-              {completionRate}%
+              {completionRate === null ? "Pending audit" : `${completionRate}%`}
             </div>
           </div>
         </div>
@@ -35,7 +39,7 @@ const StudentDashboard = ({ user }) => {
 
       <div className="right-panel">
         {/* The 24/7 AI Advisor integrated via the backend route */}
-        <AIChat user={user} />
+        <AIChat user={user} onStudentProfileUpdate={onStudentProfileUpdate} />
       </div>
     </div>
   );

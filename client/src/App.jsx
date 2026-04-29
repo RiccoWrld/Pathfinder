@@ -1,18 +1,26 @@
-import { useState } from 'react';
-import StudentDashboard from './components/StudentDashboard';
-import Signup from './components/SignUp';
-import Login from './components/Login'; 
-import './App.css';
+import { useState } from "react";
+import StudentDashboard from "./components/StudentDashboard";
+import Signup from "./components/SignUp";
+import Login from "./components/Login";
+import "./App.css";
 
 function App() {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
-  const [view, setView] = useState('login');
+  const [view, setView] = useState("login");
   const [user, setUser] = useState(null);
 
   const handleLogin = (userData) => {
     // userData contains the id, role, and university_id from your database
     setUser(userData);
     setIsLoggedIn(true);
+  };
+
+  const updateStudentProfile = (profileData) => {
+    setUser((prevUser) => {
+      const nextUser = { ...prevUser, ...profileData };
+      localStorage.setItem("user", JSON.stringify(nextUser));
+      return nextUser;
+    });
   };
 
   return (
@@ -22,19 +30,27 @@ function App() {
 
       {!isLoggedIn ? (
         <div className="auth-wrapper">
-          {view === 'login' ? (
+          {view === "login" ? (
             <Login onLoginSuccess={handleLogin} />
           ) : (
-            <Signup onSignupSuccess={() => setView('login')} />
+            <Signup onSignupSuccess={() => setView("login")} />
           )}
-          
-          <button className="toggle-auth" onClick={() => setView(view === 'login' ? 'signup' : 'login')}>
-            {view === 'login' ? "Need an account? Sign Up" : "Already have an account? Login"}
+
+          <button
+            className="toggle-auth"
+            onClick={() => setView(view === "login" ? "signup" : "login")}
+          >
+            {view === "login"
+              ? "Need an account? Sign Up"
+              : "Already have an account? Login"}
           </button>
         </div>
       ) : (
         /* Replaced <NotificationArea /> with the full Dashboard */
-        <StudentDashboard user={user} />
+        <StudentDashboard
+          user={user}
+          onStudentProfileUpdate={updateStudentProfile}
+        />
       )}
     </section>
   );
