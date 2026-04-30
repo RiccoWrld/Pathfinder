@@ -62,3 +62,11 @@ INSERT INTO alerts (
  'Review your audit and ask your advisor to confirm remaining requirements.',
  'system')
 ON CONFLICT DO NOTHING;
+
+CREATE TABLE IF NOT EXISTS advisor_notes (
+    id SERIAL PRIMARY KEY,
+    student_id INT REFERENCES students(id) ON DELETE CASCADE,
+    advisor_id INT REFERENCES advisors(id) ON DELETE CASCADE,
+    note TEXT NOT NULL,
+    created_at TIMESTAMP DEFAULT NOW()
+);

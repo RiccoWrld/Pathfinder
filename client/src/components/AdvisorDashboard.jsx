@@ -3,10 +3,25 @@ import './AdvisorDashboard.css';
 
 const priorityRank = { high: 1, medium: 2, low: 3 };
 
+const formatDateTime = (value) => {
+  if (!value) return 'Just now';
+
+  return new Intl.DateTimeFormat(undefined, {
+    month: 'short',
+    day: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+  }).format(new Date(value));
+};
+
 const AdvisorDashboard = ({ user, onLogout }) => {
   const advisorId = user?.advisor_id || user?.id;
   const [alerts, setAlerts] = useState([]);
   const [students, setStudents] = useState([]);
+  const [expandedStudentId, setExpandedStudentId] = useState(null);
+  const [notesByStudent, setNotesByStudent] = useState({});
+  const [noteDrafts, setNoteDrafts] = useState({});
+  const [savingNoteId, setSavingNoteId] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
@@ -106,6 +121,69 @@ const AdvisorDashboard = ({ user, onLogout }) => {
     }
   };
 
+  const loadStudentNotes = async (studentId) => {
+    if (!advisorId || notesByStudent[studentId]) return;
+
+    try {
+      const response = await fetch(
+        `http://localhost:5000/api/students/${studentId}/notes?advisorId=${advisorId}`,
+      );
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Could not load notes');
+      }
+
+      setNotesByStudent(prev => ({
+        ...prev,
+        [studentId]: Array.isArray(data) ? data : [],
+      }));
+    } catch {
+      setError('Could not load student notes.');
+    }
+  };
+
+  const toggleStudentNotes = (studentId) => {
+    setExpandedStudentId(prev => {
+      const nextStudentId = prev === studentId ? null : studentId;
+      if (nextStudentId) {
+        loadStudentNotes(nextStudentId);
+      }
+      return nextStudentId;
+    });
+  };
+
+  const saveStudentNote = async (studentId) => {
+    const note = String(noteDrafts[studentId] || '').trim();
+    if (!note || !advisorId) return;
+
+    setSavingNoteId(studentId);
+    setError('');
+
+    try {
+      const response = await fetch(`http://localhost:5000/api/students/${studentId}/notes`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ advisor_id: advisorId, note }),
+      });
+      const savedNote = await response.json();
+
+      if (!response.ok) {
+        throw new Error(savedNote.error || 'Could not save note');
+      }
+
+      setNotesByStudent(prev => ({
+        ...prev,
+        [studentId]: [savedNote, ...(prev[studentId] || [])],
+      }));
+      setNoteDrafts(prev => ({ ...prev, [studentId]: '' }));
+    } catch {
+      setError('Could not save student note.');
+    } finally {
+      setSavingNoteId(null);
+    }
+  };
+
   const stats = useMemo(() => {
     const highPriority = alerts.filter(alert => alert.priority === 'high').length;
     const acknowledged = alerts.filter(alert => alert.status === 'acknowledged').length;
@@ -179,17 +257,58 @@ const AdvisorDashboard = ({ user, onLogout }) => {
           <div className="advisor-roster-list">
             {students.map(student => (
               <article key={student.id} className="advisor-student-card">
-                <div>
-                  <h3>{student.name || 'Student'}</h3>
-                  <p>{student.email}</p>
+                <div className="advisor-student-summary">
+                  <div>
+                    <h3>{student.name || 'Student'}</h3>
+                    <p>{student.email}</p>
+                  </div>
+                  <div className="advisor-roster-metrics">
+                    <span>GPA {student.gpa ?? 'N/A'}</span>
+                    <span>{student.academic_standing || student.status || 'status pending'}</span>
+                    <span>{student.completion_rate ?? 'No'}% complete</span>
+                    <span>{student.active_alert_count || 0} active alerts</span>
+                    <span>{student.high_priority_alert_count || 0} high priority</span>
+                  </div>
+                  <button className="advisor-note-toggle" onClick={() => toggleStudentNotes(student.id)}>
+                    {expandedStudentId === student.id ? 'Hide Notes' : 'Notes'}
+                  </button>
                 </div>
-                <div className="advisor-roster-metrics">
-                  <span>GPA {student.gpa ?? 'N/A'}</span>
-                  <span>{student.academic_standing || student.status || 'status pending'}</span>
-                  <span>{student.completion_rate ?? 'No'}% complete</span>
-                  <span>{student.active_alert_count || 0} active alerts</span>
-                  <span>{student.high_priority_alert_count || 0} high priority</span>
-                </div>
+
+                {expandedStudentId === student.id && (
+                  <div className="advisor-note-panel">
+                    <textarea
+                      value={noteDrafts[student.id] || ''}
+                      maxLength={2000}
+                      placeholder="Add a follow-up note for this student..."
+                      onChange={(event) => setNoteDrafts(prev => ({
+                        ...prev,
+                        [student.id]: event.target.value,
+                      }))}
+                    />
+                    <div className="advisor-note-actions">
+                      <span>{(noteDrafts[student.id] || '').length}/2000</span>
+                      <button
+                        onClick={() => saveStudentNote(student.id)}
+                        disabled={savingNoteId === student.id || !String(noteDrafts[student.id] || '').trim()}
+                      >
+                        {savingNoteId === student.id ? 'Saving' : 'Save Note'}
+                      </button>
+                    </div>
+
+                    <div className="advisor-note-list">
+                      {(notesByStudent[student.id] || []).length > 0 ? (
+                        notesByStudent[student.id].map(note => (
+                          <div key={note.id} className="advisor-note-item">
+                            <p>{note.note}</p>
+                            <span>{formatDateTime(note.created_at)}</span>
+                          </div>
+                        ))
+                      ) : (
+                        <p className="advisor-note-empty">No notes yet.</p>
+                      )}
+                    </div>
+                  </div>
+                )}
               </article>
             ))}
           </div>

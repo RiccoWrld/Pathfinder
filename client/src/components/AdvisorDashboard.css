@@ -132,14 +132,20 @@
 }
 
 .advisor-student-card {
-  display: grid;
-  grid-template-columns: minmax(0, 260px) 1fr;
-  gap: 16px;
-  align-items: center;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
   border: 1px solid #334155;
   border-radius: 8px;
   background: #1e293b;
   padding: 14px 16px;
+}
+
+.advisor-student-summary {
+  display: grid;
+  grid-template-columns: minmax(0, 260px) 1fr auto;
+  gap: 16px;
+  align-items: center;
 }
 
 .advisor-student-card h3 {
@@ -168,6 +174,92 @@
   line-height: 1;
   padding: 6px 9px;
   text-transform: capitalize;
+}
+
+.advisor-note-toggle,
+.advisor-note-actions button {
+  border: 1px solid #475569;
+  border-radius: 6px;
+  background: #111827;
+  color: #f8fafc;
+  cursor: pointer;
+  font-weight: 700;
+  padding: 8px 12px;
+  white-space: nowrap;
+}
+
+.advisor-note-toggle:hover,
+.advisor-note-actions button:hover {
+  border-color: #38bdf8;
+  color: #7dd3fc;
+}
+
+.advisor-note-actions button:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.advisor-note-panel {
+  border-top: 1px solid #334155;
+  padding-top: 12px;
+}
+
+.advisor-note-panel textarea {
+  box-sizing: border-box;
+  width: 100%;
+  min-height: 86px;
+  resize: vertical;
+  border: 1px solid #475569;
+  border-radius: 8px;
+  background: #0f172a;
+  color: #f8fafc;
+  font: inherit;
+  line-height: 1.4;
+  padding: 10px 12px;
+}
+
+.advisor-note-panel textarea:focus {
+  border-color: #38bdf8;
+  outline: none;
+}
+
+.advisor-note-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 8px;
+}
+
+.advisor-note-actions span,
+.advisor-note-empty {
+  color: #94a3b8;
+  font-size: 0.82rem;
+}
+
+.advisor-note-list {
+  display: grid;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.advisor-note-item {
+  border: 1px solid #334155;
+  border-radius: 8px;
+  background: #111827;
+  padding: 10px 12px;
+}
+
+.advisor-note-item p {
+  color: #e2e8f0;
+  font-size: 0.9rem;
+  margin-bottom: 6px;
+  white-space: pre-wrap;
+}
+
+.advisor-note-item span {
+  color: #94a3b8;
+  font-size: 0.76rem;
 }
 
 .advisor-alert-card {
@@ -284,7 +376,7 @@
     grid-template-columns: 1fr;
   }
 
-  .advisor-student-card {
+  .advisor-student-summary {
     grid-template-columns: 1fr;
   }
 
