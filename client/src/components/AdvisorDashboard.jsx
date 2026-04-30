@@ -19,9 +19,11 @@ const AdvisorDashboard = ({ user, onLogout }) => {
   const [alerts, setAlerts] = useState([]);
   const [students, setStudents] = useState([]);
   const [expandedStudentId, setExpandedStudentId] = useState(null);
+  const [selectedStudentId, setSelectedStudentId] = useState(null);
   const [notesByStudent, setNotesByStudent] = useState({});
   const [noteDrafts, setNoteDrafts] = useState({});
   const [savingNoteId, setSavingNoteId] = useState(null);
+  const [deletingNoteId, setDeletingNoteId] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
@@ -153,6 +155,11 @@ const AdvisorDashboard = ({ user, onLogout }) => {
     });
   };
 
+  const selectStudent = (studentId) => {
+    setSelectedStudentId(studentId);
+    loadStudentNotes(studentId);
+  };
+
   const saveStudentNote = async (studentId) => {
     const note = String(noteDrafts[studentId] || '').trim();
     if (!note || !advisorId) return;
@@ -184,6 +191,34 @@ const AdvisorDashboard = ({ user, onLogout }) => {
     }
   };
 
+  const deleteStudentNote = async (studentId, noteId) => {
+    if (!advisorId) return;
+
+    setDeletingNoteId(noteId);
+    setError('');
+
+    try {
+      const response = await fetch(
+        `http://localhost:5000/api/notes/${noteId}?advisorId=${advisorId}`,
+        { method: 'DELETE' },
+      );
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Could not delete note');
+      }
+
+      setNotesByStudent(prev => ({
+        ...prev,
+        [studentId]: (prev[studentId] || []).filter(note => note.id !== noteId),
+      }));
+    } catch {
+      setError('Could not delete student note.');
+    } finally {
+      setDeletingNoteId(null);
+    }
+  };
+
   const stats = useMemo(() => {
     const highPriority = alerts.filter(alert => alert.priority === 'high').length;
     const acknowledged = alerts.filter(alert => alert.status === 'acknowledged').length;
@@ -206,6 +241,15 @@ const AdvisorDashboard = ({ user, onLogout }) => {
       return new Date(b.created_at || 0) - new Date(a.created_at || 0);
     });
   }, [alerts]);
+
+  const selectedStudent = useMemo(() => {
+    return students.find(student => student.id === selectedStudentId) || null;
+  }, [selectedStudentId, students]);
+
+  const selectedStudentAlerts = useMemo(() => {
+    if (!selectedStudent) return [];
+    return sortedAlerts.filter(alert => alert.student_id === selectedStudent.id);
+  }, [selectedStudent, sortedAlerts]);
 
   const universityLabel = user?.university_name || user?.university_domain || 'University advising';
 
@@ -269,9 +313,14 @@ const AdvisorDashboard = ({ user, onLogout }) => {
                     <span>{student.active_alert_count || 0} active alerts</span>
                     <span>{student.high_priority_alert_count || 0} high priority</span>
                   </div>
-                  <button className="advisor-note-toggle" onClick={() => toggleStudentNotes(student.id)}>
-                    {expandedStudentId === student.id ? 'Hide Notes' : 'Notes'}
-                  </button>
+                  <div className="advisor-roster-actions">
+                    <button className="advisor-detail-button" onClick={() => selectStudent(student.id)}>
+                      View Details
+                    </button>
+                    <button className="advisor-note-toggle" onClick={() => toggleStudentNotes(student.id)}>
+                      {expandedStudentId === student.id ? 'Hide Notes' : 'Notes'}
+                    </button>
+                  </div>
                 </div>
 
                 {expandedStudentId === student.id && (
@@ -299,8 +348,16 @@ const AdvisorDashboard = ({ user, onLogout }) => {
                       {(notesByStudent[student.id] || []).length > 0 ? (
                         notesByStudent[student.id].map(note => (
                           <div key={note.id} className="advisor-note-item">
-                            <p>{note.note}</p>
-                            <span>{formatDateTime(note.created_at)}</span>
+                            <div>
+                              <p>{note.note}</p>
+                              <span>{formatDateTime(note.created_at)}</span>
+                            </div>
+                            <button
+                              onClick={() => deleteStudentNote(student.id, note.id)}
+                              disabled={deletingNoteId === note.id}
+                            >
+                              {deletingNoteId === note.id ? 'Deleting' : 'Delete'}
+                            </button>
                           </div>
                         ))
                       ) : (
@@ -316,6 +373,92 @@ const AdvisorDashboard = ({ user, onLogout }) => {
           <p className="advisor-empty">No students are assigned to you yet.</p>
         )}
       </section>
+
+      {selectedStudent && (
+        <section className="advisor-detail-view">
+          <div className="advisor-section-heading">
+            <div>
+              <h2>{selectedStudent.name || 'Student'} Detail</h2>
+              <p>{selectedStudent.email}</p>
+            </div>
+            <button className="advisor-detail-close" onClick={() => setSelectedStudentId(null)}>
+              Close
+            </button>
+          </div>
+
+          <div className="advisor-detail-grid">
+            <div className="advisor-detail-card">
+              <h3>Profile</h3>
+              <div className="advisor-detail-metrics">
+                <span>GPA {selectedStudent.gpa ?? 'N/A'}</span>
+                <span>{selectedStudent.academic_standing || selectedStudent.status || 'status pending'}</span>
+                <span>{selectedStudent.completion_rate ?? 'No'}% complete</span>
+                <span>{selectedStudent.last_audit_uploaded_at ? `Audit ${formatDateTime(selectedStudent.last_audit_uploaded_at)}` : 'No audit uploaded'}</span>
+              </div>
+            </div>
+
+            <div className="advisor-detail-card">
+              <h3>Active Alerts</h3>
+              {selectedStudentAlerts.length > 0 ? (
+                <div className="advisor-detail-alerts">
+                  {selectedStudentAlerts.map(alert => (
+                    <div key={alert.id} className={`advisor-detail-alert ${alert.priority || 'medium'}`}>
+                      <strong>{alert.title || 'Academic Alert'}</strong>
+                      <p>{alert.message}</p>
+                      {alert.recommended_action && <span>{alert.recommended_action}</span>}
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="advisor-note-empty">No active alerts for this student.</p>
+              )}
+            </div>
+
+            <div className="advisor-detail-card advisor-detail-notes">
+              <h3>Notes</h3>
+              <textarea
+                value={noteDrafts[selectedStudent.id] || ''}
+                maxLength={2000}
+                placeholder="Add a follow-up note for this student..."
+                onChange={(event) => setNoteDrafts(prev => ({
+                  ...prev,
+                  [selectedStudent.id]: event.target.value,
+                }))}
+              />
+              <div className="advisor-note-actions">
+                <span>{(noteDrafts[selectedStudent.id] || '').length}/2000</span>
+                <button
+                  onClick={() => saveStudentNote(selectedStudent.id)}
+                  disabled={savingNoteId === selectedStudent.id || !String(noteDrafts[selectedStudent.id] || '').trim()}
+                >
+                  {savingNoteId === selectedStudent.id ? 'Saving' : 'Save Note'}
+                </button>
+              </div>
+
+              <div className="advisor-note-list">
+                {(notesByStudent[selectedStudent.id] || []).length > 0 ? (
+                  notesByStudent[selectedStudent.id].map(note => (
+                    <div key={note.id} className="advisor-note-item">
+                      <div>
+                        <p>{note.note}</p>
+                        <span>{formatDateTime(note.created_at)}</span>
+                      </div>
+                      <button
+                        onClick={() => deleteStudentNote(selectedStudent.id, note.id)}
+                        disabled={deletingNoteId === note.id}
+                      >
+                        {deletingNoteId === note.id ? 'Deleting' : 'Delete'}
+                      </button>
+                    </div>
+                  ))
+                ) : (
+                  <p className="advisor-note-empty">No notes yet.</p>
+                )}
+              </div>
+            </div>
+          </div>
+        </section>
+      )}
 
       <section className="advisor-alerts">
         <div className="advisor-section-heading">

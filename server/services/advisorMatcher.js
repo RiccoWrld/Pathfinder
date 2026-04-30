@@ -1,5 +1,5 @@
-const normalizePersonName = (name = "") => {
-  return name
+const normalizePersonName = (name) => {
+  return String(name || "")
     .toLowerCase()
     .replace(/[^a-z\s]/g, " ")
     .replace(/\b(dr|prof|professor|mr|mrs|ms)\b/g, " ")

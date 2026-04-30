@@ -88,4 +88,32 @@ router.post("/students/:studentId/notes", async (req, res) => {
   }
 });
 
+router.delete("/notes/:noteId", async (req, res) => {
+  const advisorId = Number(req.query.advisorId);
+  const noteId = Number(req.params.noteId);
+
+  if (!Number.isInteger(advisorId) || !Number.isInteger(noteId)) {
+    return res.status(400).json({ error: "noteId and advisorId are required" });
+  }
+
+  try {
+    await ensureNotesTable();
+
+    const result = await pool.query(
+      `DELETE FROM advisor_notes
+       WHERE id = $1 AND advisor_id = $2
+       RETURNING id, student_id`,
+      [noteId, advisorId],
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: "Note not found" });
+    }
+
+    res.json({ deleted: true, note: result.rows[0] });
+  } catch (error) {
+    res.status(500).json({ error: "Internal Server Error" });
+  }
+});
+
 module.exports = router;

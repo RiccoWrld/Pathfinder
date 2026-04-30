@@ -177,6 +177,8 @@
 }
 
 .advisor-note-toggle,
+.advisor-detail-button,
+.advisor-detail-close,
 .advisor-note-actions button {
   border: 1px solid #475569;
   border-radius: 6px;
@@ -189,6 +191,8 @@
 }
 
 .advisor-note-toggle:hover,
+.advisor-detail-button:hover,
+.advisor-detail-close:hover,
 .advisor-note-actions button:hover {
   border-color: #38bdf8;
   color: #7dd3fc;
@@ -244,6 +248,10 @@
 }
 
 .advisor-note-item {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
   border: 1px solid #334155;
   border-radius: 8px;
   background: #111827;
@@ -260,6 +268,146 @@
 .advisor-note-item span {
   color: #94a3b8;
   font-size: 0.76rem;
+}
+
+.advisor-note-item button {
+  border: 1px solid rgba(239, 68, 68, 0.45);
+  border-radius: 6px;
+  background: rgba(239, 68, 68, 0.1);
+  color: #fecaca;
+  cursor: pointer;
+  flex-shrink: 0;
+  font-size: 0.78rem;
+  font-weight: 700;
+  padding: 6px 9px;
+}
+
+.advisor-note-item button:hover {
+  border-color: #ef4444;
+  color: #fee2e2;
+}
+
+.advisor-note-item button:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.advisor-roster-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: flex-end;
+}
+
+.advisor-detail-view {
+  border: 1px solid #334155;
+  border-radius: 8px;
+  background: #111827;
+  margin-bottom: 24px;
+  padding: 20px;
+}
+
+.advisor-detail-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.2fr);
+  gap: 14px;
+}
+
+.advisor-detail-card {
+  border: 1px solid #334155;
+  border-radius: 8px;
+  background: #1e293b;
+  padding: 16px;
+}
+
+.advisor-detail-card h3 {
+  color: #f8fafc;
+  font-size: 1rem;
+  margin: 0 0 12px;
+}
+
+.advisor-detail-notes {
+  grid-column: 1 / -1;
+}
+
+.advisor-detail-notes textarea {
+  box-sizing: border-box;
+  width: 100%;
+  min-height: 100px;
+  resize: vertical;
+  border: 1px solid #475569;
+  border-radius: 8px;
+  background: #0f172a;
+  color: #f8fafc;
+  font: inherit;
+  line-height: 1.4;
+  padding: 10px 12px;
+}
+
+.advisor-detail-notes textarea:focus {
+  border-color: #38bdf8;
+  outline: none;
+}
+
+.advisor-detail-metrics {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.advisor-detail-metrics span {
+  border: 1px solid #475569;
+  border-radius: 999px;
+  color: #cbd5e1;
+  font-size: 0.78rem;
+  line-height: 1;
+  padding: 6px 9px;
+  text-transform: capitalize;
+}
+
+.advisor-detail-alerts {
+  display: grid;
+  gap: 8px;
+}
+
+.advisor-detail-alert {
+  border: 1px solid #334155;
+  border-left: 4px solid #38bdf8;
+  border-radius: 8px;
+  background: #111827;
+  padding: 10px 12px;
+}
+
+.advisor-detail-alert.high {
+  border-left-color: #ef4444;
+}
+
+.advisor-detail-alert.medium {
+  border-left-color: #f59e0b;
+}
+
+.advisor-detail-alert.low {
+  border-left-color: #22c55e;
+}
+
+.advisor-detail-alert strong {
+  color: #f8fafc;
+  display: block;
+  font-size: 0.92rem;
+  margin-bottom: 5px;
+}
+
+.advisor-detail-alert p,
+.advisor-detail-alert span {
+  color: #94a3b8;
+  font-size: 0.84rem;
+}
+
+.advisor-detail-alert span {
+  color: #e2e8f0;
+  display: block;
+  font-weight: 700;
+  margin-top: 8px;
 }
 
 .advisor-alert-card {
@@ -382,6 +530,18 @@
 
   .advisor-roster-metrics {
     justify-content: flex-start;
+  }
+
+  .advisor-roster-actions {
+    justify-content: flex-start;
+  }
+
+  .advisor-detail-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .advisor-note-item {
+    flex-direction: column;
   }
 
   .advisor-student-panel {
