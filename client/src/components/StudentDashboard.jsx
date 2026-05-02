@@ -5,9 +5,12 @@ import './StudentDashboard.css';
 
 const StudentDashboard = ({ user, onStudentProfileUpdate, onLogout }) => {
   const [alertsRefreshKey, setAlertsRefreshKey] = useState(0);
-  const completionRate = Number.isFinite(user?.completion_rate)
+  const requirementsPercent = Number.isFinite(user?.completion_rate)
     ? user.completion_rate
     : null;
+  const missingRequirementItems = Array.isArray(user?.missing_requirements)
+    ? user.missing_requirements.slice(0, 4)
+    : [];
   const universityLabel = user?.university_name || user?.university_domain || "Upload DegreeWorks to detect school";
   const studentId = user?.student_id || user?.id;
 
@@ -27,19 +30,41 @@ const StudentDashboard = ({ user, onStudentProfileUpdate, onLogout }) => {
         <NotificationArea studentId={studentId} refreshKey={alertsRefreshKey} />
         
         <div className="degree-progress">
-          <h3>Degree Completion</h3>
-          {completionRate === null && (
-            <p className="progress-note">Upload a DegreeWorks audit to calculate your progress.</p>
-          )}
-          <div className="progress-bar-container">
-            {/* The width now updates dynamically based on the completionRate variable */}
-            <div 
-              className={`progress-fill ${completionRate === null ? 'pending' : ''}`}
-              style={{ width: `${completionRate ?? 100}%` }}
+          <div className="progress-heading">
+            <div>
+              <h3>DegreeWorks Requirements</h3>
+              <p className="progress-note">
+                {requirementsPercent === null
+                  ? "Upload a DegreeWorks audit to calculate your requirements progress."
+                  : "Requirements progress from your DegreeWorks audit."}
+              </p>
+            </div>
+            {requirementsPercent !== null && (
+              <strong>{requirementsPercent}%</strong>
+            )}
+          </div>
+
+          <div className="progress-bar-container" aria-label="DegreeWorks requirements progress">
+            <div
+              className={`progress-fill ${requirementsPercent === null ? 'pending' : ''}`}
+              style={{ width: `${requirementsPercent ?? 100}%` }}
             >
-              {completionRate === null ? "Pending audit" : `${completionRate}%`}
+              {requirementsPercent === null ? "Pending audit" : `${requirementsPercent}% Requirements`}
             </div>
           </div>
+
+          {missingRequirementItems.length > 0 && (
+            <div className="missing-requirements">
+              <h4>Missing Requirements</h4>
+              {missingRequirementItems.map((requirement, index) => (
+                <p key={`${requirement.course_code || 'requirement'}-${index}`}>
+                  {requirement.course_code
+                    ? `${requirement.course_code}: ${requirement.requirement}`
+                    : requirement.requirement}
+                </p>
+              ))}
+            </div>
+          )}
         </div>
       </div>
 

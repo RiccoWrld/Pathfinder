@@ -2,6 +2,7 @@ const express = require("express");
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
 const pool = require("../db");
+const { ensureRequirementProgressColumns } = require("../services/schemaGuards");
 
 const router = express.Router();
 
@@ -116,6 +117,8 @@ router.post("/auth/signup", async (req, res) => {
 router.post("/auth/login", async (req, res) => {
   const { email, password } = req.body;
   try {
+    await ensureRequirementProgressColumns(pool);
+
     const user = await pool.query(
       `SELECT
          users.*,
@@ -127,6 +130,10 @@ router.post("/auth/login", async (req, res) => {
          students.completion_rate AS student_completion_rate,
          students.academic_standing AS student_academic_standing,
          students.last_audit_uploaded_at AS student_last_audit_uploaded_at,
+         students.requirement_completed_count AS student_requirement_completed_count,
+         students.requirement_in_progress_count AS student_requirement_in_progress_count,
+         students.requirement_missing_count AS student_requirement_missing_count,
+         students.requirement_total_count AS student_requirement_total_count,
          advisors.id AS advisor_profile_id,
          advisors.name AS advisor_name,
          COALESCE(students.audit_university_name, user_universities.name, advisor_universities.name, email_universities.name, student_universities.name) AS university_name,
@@ -183,6 +190,14 @@ router.post("/auth/login", async (req, res) => {
         status:
           user.rows[0].student_academic_standing || user.rows[0].student_status,
         completion_rate: user.rows[0].student_completion_rate,
+        requirement_progress: user.rows[0].student_requirement_total_count
+          ? {
+              completed: user.rows[0].student_requirement_completed_count || 0,
+              in_progress: user.rows[0].student_requirement_in_progress_count || 0,
+              missing: user.rows[0].student_requirement_missing_count || 0,
+              total: user.rows[0].student_requirement_total_count || 0,
+            }
+          : null,
         last_audit_uploaded_at: user.rows[0].student_last_audit_uploaded_at,
       },
     });

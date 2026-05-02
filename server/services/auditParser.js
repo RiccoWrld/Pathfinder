@@ -26,6 +26,21 @@ const extractPercentNear = (text, labels) => {
   return null;
 };
 
+const extractRequirementCompletion = (text) => {
+  const patterns = [
+    /Degree\s*progress[\s\S]{0,120}?(\d{1,3})(?:\.\d+)?\s*%\s*Requirements/i,
+    /(\d{1,3})(?:\.\d+)?\s*%\s*Requirements/i,
+    /Requirements[^\\n%]{0,80}(\d{1,3})(?:\.\d+)?\s*%/i,
+  ];
+
+  for (const pattern of patterns) {
+    const percent = clampPercent(text.match(pattern)?.[1]);
+    if (percent !== null) return percent;
+  }
+
+  return null;
+};
+
 const extractCreditCompletion = (text) => {
   const patterns = [
     {
@@ -200,10 +215,58 @@ const extractMissingRequirements = (text = "") => {
   ).slice(0, 12);
 };
 
+const countMatchingLines = (lines, matcher) => {
+  return lines.reduce((count, line) => (matcher(line) ? count + 1 : count), 0);
+};
+
+const extractRequirementProgress = (text = "", missingRequirements = []) => {
+  const lines = text
+    .split("\n")
+    .map((line) => line.trim())
+    .filter(Boolean);
+
+  const completed = countMatchingLines(
+    lines,
+    (line) =>
+      /\b(complete|completed|\(met\)|satisfied)\b/i.test(line) &&
+      !/\b(not complete|incomplete|still needed|unmet)\b/i.test(line),
+  );
+  const inProgress = countMatchingLines(
+    lines,
+    (line) => /\b(in-progress|in progress|ip|reg|registered)\b/i.test(line),
+  );
+  const missingLineCount = countMatchingLines(
+    lines,
+    (line) => /\b(still needed|unmet|not complete)\b/i.test(line),
+  );
+  const missing = Math.max(missingRequirements.length, missingLineCount);
+  const total = completed + inProgress + missing;
+
+  if (total <= 0) {
+    return {
+      completed: 0,
+      in_progress: 0,
+      missing: missingRequirements.length,
+      total: missingRequirements.length,
+      percent_complete: missingRequirements.length > 0 ? 0 : null,
+    };
+  }
+
+  return {
+    completed,
+    in_progress: inProgress,
+    missing,
+    total,
+    percent_complete: clampPercent((completed / total) * 100),
+  };
+};
+
 const extractAuditSummary = (auditText = "") => {
   if (!auditText) return {};
 
+  const missingRequirements = extractMissingRequirements(auditText);
   const completionRate =
+    extractRequirementCompletion(auditText) ??
     extractPercentNear(auditText, [
       "degree\\s*progress",
       "overall\\s*progress",
@@ -232,8 +295,14 @@ const extractAuditSummary = (auditText = "") => {
     has_in_progress: /\bIN-PROGRESS\b|in-progress\s*credits/i.test(auditText),
     is_nearly_complete: /nearly complete/i.test(auditText),
     has_unmet_requirements: /still needed|not complete|unmet/i.test(auditText),
-    missing_requirements: extractMissingRequirements(auditText),
+    missing_requirements: missingRequirements,
+    requirement_progress: extractRequirementProgress(auditText, missingRequirements),
   };
 };
 
-module.exports = { extractAuditSummary, normalizeAuditText, extractMissingRequirements };
+module.exports = {
+  extractAuditSummary,
+  normalizeAuditText,
+  extractMissingRequirements,
+  extractRequirementProgress,
+};

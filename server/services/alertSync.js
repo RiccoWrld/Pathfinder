@@ -1,5 +1,6 @@
 const pool = require("../db");
 const { matchAdvisorFromAudit } = require("./advisorMatcher");
+const { ensureRequirementProgressColumns } = require("./schemaGuards");
 
 const getAuditAlertKey = ({ category, title, message }) =>
   [category || "", title || "", message || ""].join("::");
@@ -49,6 +50,7 @@ const syncAuditAlerts = async (studentId, auditSummary) => {
 
   try {
     await client.query("BEGIN");
+    await ensureRequirementProgressColumns(client);
 
     const studentResult = await client.query(
       "SELECT advisor_id, university_id FROM students WHERE id = $1",
@@ -144,6 +146,10 @@ const syncAuditAlerts = async (studentId, auditSummary) => {
            academic_standing = COALESCE($5, academic_standing),
            audit_university_name = COALESCE($6, audit_university_name),
            advisor_id = COALESCE($7, advisor_id),
+           requirement_completed_count = COALESCE($8, requirement_completed_count),
+           requirement_in_progress_count = COALESCE($9, requirement_in_progress_count),
+           requirement_missing_count = COALESCE($10, requirement_missing_count),
+           requirement_total_count = COALESCE($11, requirement_total_count),
            last_audit_uploaded_at = NOW()
        WHERE id = $1`,
       [
@@ -156,6 +162,18 @@ const syncAuditAlerts = async (studentId, auditSummary) => {
         auditSummary.academic_standing,
         auditSummary.university_name,
         matchedAdvisor?.id || null,
+        Number.isFinite(auditSummary.requirement_progress?.completed)
+          ? auditSummary.requirement_progress.completed
+          : null,
+        Number.isFinite(auditSummary.requirement_progress?.in_progress)
+          ? auditSummary.requirement_progress.in_progress
+          : null,
+        Number.isFinite(auditSummary.requirement_progress?.missing)
+          ? auditSummary.requirement_progress.missing
+          : null,
+        Number.isFinite(auditSummary.requirement_progress?.total)
+          ? auditSummary.requirement_progress.total
+          : null,
       ],
     );
 

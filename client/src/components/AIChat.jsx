@@ -61,6 +61,14 @@ const AIChat = ({ user, onStudentProfileUpdate, onAlertsSynced }) => {
           profileUpdate.completion_rate = data.auditSummary.completion_rate;
         }
 
+        if (data.auditSummary.requirement_progress) {
+          profileUpdate.requirement_progress = data.auditSummary.requirement_progress;
+        }
+
+        if (Array.isArray(data.auditSummary.missing_requirements)) {
+          profileUpdate.missing_requirements = data.auditSummary.missing_requirements;
+        }
+
         if (data.auditSummary.university_name) {
           profileUpdate.university_name = data.auditSummary.university_name;
         }

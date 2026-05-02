@@ -1,5 +1,6 @@
 const express = require("express");
 const pool = require("../db");
+const { ensureRequirementProgressColumns } = require("../services/schemaGuards");
 
 const router = express.Router();
 
@@ -33,6 +34,8 @@ router.get("/advisors/:advisorId/alerts", async (req, res) => {
 
 router.get("/advisors/:advisorId/students", async (req, res) => {
   try {
+    await ensureRequirementProgressColumns(pool);
+
     const result = await pool.query(
       `SELECT
          students.id,
@@ -41,6 +44,10 @@ router.get("/advisors/:advisorId/students", async (req, res) => {
          students.gpa,
          students.status,
          students.completion_rate,
+         students.requirement_completed_count,
+         students.requirement_in_progress_count,
+         students.requirement_missing_count,
+         students.requirement_total_count,
          students.academic_standing,
          students.last_audit_uploaded_at,
          students.audit_university_name,
