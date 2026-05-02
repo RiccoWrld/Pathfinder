@@ -49,21 +49,51 @@ function App() {
       <div className="hero"></div>
 
       {!isLoggedIn ? (
-        <div className="auth-wrapper">
-          {view === "login" ? (
-            <Login onLoginSuccess={handleLogin} />
-          ) : (
-            <Signup onSignupSuccess={() => setView("login")} />
-          )}
+        <div className="auth-page">
+          <aside className="auth-brand-panel">
+            <div className="auth-brand">
+              <img src="/PathfinderLogo.png" alt="Pathfinder" />
+              <span>Pathfinder</span>
+            </div>
+            <div className="auth-brand-copy">
+              <p className="auth-kicker">Academic planning workspace</p>
+              <h1>Keep every student, advisor, and requirement moving forward.</h1>
+              <p>
+                Upload DegreeWorks audits, surface urgent requirements, and give advising teams a clear view of what needs attention.
+              </p>
+            </div>
+            <div className="auth-proof-grid" aria-label="Pathfinder highlights">
+              <div>
+                <strong>Audit-aware</strong>
+                <span>Alerts from academic progress data</span>
+              </div>
+              <div>
+                <strong>Advisor-ready</strong>
+                <span>Prioritized cases and follow-up notes</span>
+              </div>
+              <div>
+                <strong>Student-first</strong>
+                <span>Clear actions after every review</span>
+              </div>
+            </div>
+          </aside>
 
-          <button
-            className="toggle-auth"
-            onClick={() => setView(view === "login" ? "signup" : "login")}
-          >
-            {view === "login"
-              ? "Need an account? Sign Up"
-              : "Already have an account? Login"}
-          </button>
+          <section className="auth-panel" aria-label={view === "login" ? "Login" : "Sign up"}>
+            {view === "login" ? (
+              <Login onLoginSuccess={handleLogin} />
+            ) : (
+              <Signup onSignupSuccess={() => setView("login")} />
+            )}
+
+            <button
+              className="toggle-auth"
+              onClick={() => setView(view === "login" ? "signup" : "login")}
+            >
+              {view === "login"
+                ? "Create a Pathfinder account"
+                : "Back to login"}
+            </button>
+          </section>
         </div>
       ) : user?.role === "advisor" ? (
         <AdvisorDashboard user={user} onLogout={handleLogout} />

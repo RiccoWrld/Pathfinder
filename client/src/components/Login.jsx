@@ -31,23 +31,34 @@ const Login = ({ onLoginSuccess }) => {
 
   return (
     <div className="auth-container">
-      <h2>Login to Pathfinder</h2>
-      <form onSubmit={handleSubmit}>
-        <input 
+      <div className="auth-heading">
+        <p>Welcome back</p>
+        <h2>Log in to Pathfinder</h2>
+        <span>Use your university credentials to continue to your advising workspace.</span>
+      </div>
+
+      <form onSubmit={handleSubmit} className="auth-form">
+        <label htmlFor="login-email">University Email</label>
+        <input
+          id="login-email"
           type="email" 
-          placeholder="University Email" 
+          placeholder="name@university.edu"
           required 
           onChange={(e) => setFormData({...formData, email: e.target.value})}
         />
-        <input 
+
+        <label htmlFor="login-password">Password</label>
+        <input
+          id="login-password"
           type="password" 
-          placeholder="Password" 
+          placeholder="Enter your password"
           required 
           onChange={(e) => setFormData({...formData, password: e.target.value})}
         />
-        <button type="submit">Login</button>
+
+        <button type="submit">Log in</button>
       </form>
-      {error && <p className="auth-message" style={{color: 'red'}}>{error}</p>}
+      {error && <p className="auth-message error">{error}</p>}
     </div>
   );
 };

@@ -42,45 +42,57 @@ const Signup = ({ onSignupSuccess }) => {
 
   return (
     <div className="auth-container">
-      <h2>Create your Pathfinder Account</h2>
-      <form onSubmit={handleSubmit}>
+      <div className="auth-heading">
+        <p>Start advising smarter</p>
+        <h2>Create your Pathfinder account</h2>
+        <span>Join with your university email so alerts and advising tools stay connected to the right campus.</span>
+      </div>
+
+      <form onSubmit={handleSubmit} className="auth-form">
+        <label htmlFor="signup-name">Full Name</label>
         <input
+          id="signup-name"
           type="text"
           placeholder={formData.role === 'advisor' ? 'Full Name as shown in DegreeWorks' : 'Full Name'}
           required
           value={formData.name}
           onChange={(e) => setFormData({...formData, name: e.target.value})}
         />
-        <input 
+        <label htmlFor="signup-email">University Email</label>
+        <input
+          id="signup-email"
           type="email" 
-          placeholder="University Email" 
+          placeholder="name@university.edu"
           required 
           value={formData.email}
           onChange={(e) => setFormData({...formData, email: e.target.value})}
         />
-        <input 
+
+        <label htmlFor="signup-password">Password</label>
+        <input
+          id="signup-password"
           type="password" 
-          placeholder="Password" 
+          placeholder="Create a secure password"
           required 
           value={formData.password}
           onChange={(e) => setFormData({...formData, password: e.target.value})}
         />
         
-        <label>I am a:</label>
-        <select value={formData.role} onChange={(e) => setFormData({...formData, role: e.target.value})}>
+        <label htmlFor="signup-role">I am a</label>
+        <select id="signup-role" value={formData.role} onChange={(e) => setFormData({...formData, role: e.target.value})}>
           <option value="student">Student</option>
           <option value="advisor">Advisor</option>
         </select>
 
-        <label>Select University:</label>
-        <select required value={formData.university_id} onChange={(e) => setFormData({...formData, university_id: e.target.value})}>
+        <label htmlFor="signup-university">Select University</label>
+        <select id="signup-university" required value={formData.university_id} onChange={(e) => setFormData({...formData, university_id: e.target.value})}>
           <option value="">-- Choose School --</option>
           {universities.map(u => (
             <option key={u.id} value={u.id}>{u.name}</option>
           ))}
         </select>
 
-        <button type="submit">Sign Up</button>
+        <button type="submit">Create account</button>
       </form>
       {message && <p className="auth-message">{message}</p>}
     </div>
