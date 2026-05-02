@@ -1,10 +1,26 @@
 const pool = require("../db");
 const { matchAdvisorFromAudit } = require("./advisorMatcher");
 
+const getAuditAlertKey = ({ category, title, message }) =>
+  [category || "", title || "", message || ""].join("::");
+
 const addAuditAlert = async (
   client,
-  { studentId, advisorId, category, priority, title, message, recommendedAction },
+  {
+    studentId,
+    advisorId,
+    category,
+    priority,
+    title,
+    message,
+    recommendedAction,
+    handledAuditAlertKeys = new Set(),
+  },
 ) => {
+  if (handledAuditAlertKeys.has(getAuditAlertKey({ category, title, message }))) {
+    return false;
+  }
+
   await client.query(
     `INSERT INTO alerts (
        student_id,
@@ -19,6 +35,8 @@ const addAuditAlert = async (
      VALUES ($1, $2, $3, $4, $5, $6, $7, 'audit')`,
     [studentId, advisorId, category, priority, title, message, recommendedAction],
   );
+
+  return true;
 };
 
 const syncAuditAlerts = async (studentId, auditSummary) => {
@@ -48,6 +66,23 @@ const syncAuditAlerts = async (studentId, auditSummary) => {
       studentResult.rows[0].university_id,
     );
     const advisorId = matchedAdvisor?.id || studentResult.rows[0].advisor_id;
+
+    const handledAuditAlertsResult = await client.query(
+      `SELECT category, title, message
+       FROM alerts
+       WHERE student_id = $1
+         AND source = 'audit'
+         AND (
+           is_resolved = true
+           OR status IN ('acknowledged', 'resolved')
+           OR acknowledged_at IS NOT NULL
+           OR resolved_at IS NOT NULL
+         )`,
+      [numericStudentId],
+    );
+    const handledAuditAlertKeys = new Set(
+      handledAuditAlertsResult.rows.map((alert) => getAuditAlertKey(alert)),
+    );
 
     if (matchedAdvisor) {
       await client.query(
@@ -127,7 +162,7 @@ const syncAuditAlerts = async (studentId, auditSummary) => {
     let alertsCreated = 0;
 
     if (!auditSummary.is_good_standing || Number(auditSummary.overall_gpa) < 2) {
-      await addAuditAlert(client, {
+      const created = await addAuditAlert(client, {
         studentId: numericStudentId,
         advisorId,
         category: "academic",
@@ -135,8 +170,9 @@ const syncAuditAlerts = async (studentId, auditSummary) => {
         title: "Academic Standing Review",
         message: `Your audit indicates ${auditSummary.academic_standing || "an academic standing concern"}.`,
         recommendedAction: "Meet with your advisor to review GPA requirements and academic support options.",
+        handledAuditAlertKeys,
       });
-      alertsCreated++;
+      if (created) alertsCreated++;
     }
 
     if (
@@ -145,7 +181,7 @@ const syncAuditAlerts = async (studentId, auditSummary) => {
       auditSummary.is_nearly_complete ||
       (Number.isFinite(auditSummary.completion_rate) && auditSummary.completion_rate < 100)
     ) {
-      await addAuditAlert(client, {
+      const created = await addAuditAlert(client, {
         studentId: numericStudentId,
         advisorId,
         category: "degree_requirement",
@@ -157,14 +193,41 @@ const syncAuditAlerts = async (studentId, auditSummary) => {
           ? "Your DegreeWorks audit indicates you are nearly complete and should review in-progress requirements."
           : "Your DegreeWorks audit indicates remaining or in-progress degree requirements.",
         recommendedAction: "Review your DegreeWorks audit with your advisor before finalizing your next schedule.",
+        handledAuditAlertKeys,
       });
-      alertsCreated++;
+      if (created) alertsCreated++;
+    }
+
+    const missingRequirements = Array.isArray(auditSummary.missing_requirements)
+      ? auditSummary.missing_requirements
+      : [];
+
+    for (const missingRequirement of missingRequirements) {
+      const courseCode = missingRequirement.course_code;
+      const requirement = missingRequirement.requirement || "a required course or requirement";
+
+      const created = await addAuditAlert(client, {
+        studentId: numericStudentId,
+        advisorId,
+        category: "course_requirement",
+        priority: "medium",
+        title: courseCode
+          ? `Missing Course Requirement: ${courseCode}`
+          : "Missing Course Requirement",
+        message: courseCode
+          ? `Your audit indicates ${courseCode} may still be needed for this requirement: ${requirement}.`
+          : `Your audit indicates this requirement may still be needed: ${requirement}.`,
+        recommendedAction: "Confirm this requirement with your advisor and include it in your next registration plan.",
+        handledAuditAlertKeys,
+      });
+      if (created) alertsCreated++;
     }
 
     await client.query("COMMIT");
     return {
       synced: true,
       alertsCreated,
+      missingRequirementAlerts: missingRequirements.length,
       advisorMatched: Boolean(matchedAdvisor),
       advisorId,
       advisorName: matchedAdvisor?.name || null,

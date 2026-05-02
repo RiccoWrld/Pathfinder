@@ -130,6 +130,76 @@ const extractNumberAfter = (text, labels) => {
   return null;
 };
 
+const uniqueByKey = (items, getKey) => {
+  const seen = new Set();
+  return items.filter((item) => {
+    const key = getKey(item);
+    if (!key || seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+};
+
+const cleanRequirementText = (text = "") => {
+  return text
+    .replace(/\s+/g, " ")
+    .replace(/^[\s:;\-.,]+|[\s:;\-.,]+$/g, "")
+    .trim();
+};
+
+const extractMissingRequirements = (text = "") => {
+  const courseCodeRegex = /\b[A-Z]{2,5}\s*\d{3,4}[A-Z]?\b/g;
+  const candidates = [];
+  const lines = text.split("\n").map((line) => line.trim()).filter(Boolean);
+
+  lines.forEach((line, index) => {
+    const isMissingLine = /\b(still needed|unmet|not complete)\b/i.test(line);
+    if (!isMissingLine) return;
+
+    const contextLines = [line];
+    for (let offset = 1; offset <= 2; offset++) {
+      const nextLine = lines[index + offset];
+      if (!nextLine || /\b(still needed|unmet|not complete)\b/i.test(nextLine)) break;
+      contextLines.push(nextLine);
+    }
+    const cleanedContextLines = contextLines.map(cleanRequirementText);
+    const context = cleanedContextLines.join(" ");
+    const courseCodes = [...context.matchAll(courseCodeRegex)].map((match) =>
+      match[0].replace(/\s+/g, " ").toUpperCase(),
+    );
+    const lineRequirement = cleanRequirementText(line);
+    const requirementText =
+      lineRequirement.replace(/\b(still needed|unmet|not complete)\b\s*:?\s*/i, "")
+        ? lineRequirement
+        : context;
+
+    if (courseCodes.length > 0) {
+      courseCodes.forEach((courseCode) => {
+        candidates.push({
+          course_code: courseCode,
+          requirement: requirementText,
+        });
+      });
+      return;
+    }
+
+    const requirement = cleanRequirementText(
+      line.replace(/\b(still needed|unmet|not complete)\b\s*:?\s*/i, ""),
+    );
+    if (requirement) {
+      candidates.push({
+        course_code: null,
+        requirement,
+      });
+    }
+  });
+
+  return uniqueByKey(
+    candidates,
+    (item) => `${item.course_code || ""}|${item.requirement.toLowerCase()}`,
+  ).slice(0, 12);
+};
+
 const extractAuditSummary = (auditText = "") => {
   if (!auditText) return {};
 
@@ -162,7 +232,8 @@ const extractAuditSummary = (auditText = "") => {
     has_in_progress: /\bIN-PROGRESS\b|in-progress\s*credits/i.test(auditText),
     is_nearly_complete: /nearly complete/i.test(auditText),
     has_unmet_requirements: /still needed|not complete|unmet/i.test(auditText),
+    missing_requirements: extractMissingRequirements(auditText),
   };
 };
 
-module.exports = { extractAuditSummary, normalizeAuditText };
+module.exports = { extractAuditSummary, normalizeAuditText, extractMissingRequirements };
