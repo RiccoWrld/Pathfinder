@@ -244,7 +244,7 @@ If PostgreSQL was installed without a password for your local user, the connecti
 DATABASE_URL=postgresql://localhost:5432/pathfinder
 ```
 
-For a hosted PostgreSQL database such as Render, Supabase, Neon, Railway, or another cloud provider, copy the provider's PostgreSQL connection URL and paste it as `DATABASE_URL`. Hosted URLs usually include a remote host name and often require SSL.
+For a hosted PostgreSQL database such as Render, Supabase, Neon, Railway, or another cloud provider, copy the provider's PostgreSQL connection URL and paste it as `DATABASE_URL`. Hosted URLs usually include a remote host name and often require SSL. The backend automatically uses non-SSL for `localhost` and SSL for hosted database URLs.
 
 Variable details:
 
@@ -341,6 +341,35 @@ TRUNCATE TABLE advisor_notes, alerts, students, advisors, users RESTART IDENTITY
 ```
 
 Keep the `universities` rows unless you want users to create accounts without preloaded university options.
+
+### Common Local PostgreSQL Credential Cases
+
+If you know your PostgreSQL password, use it in `DATABASE_URL`.
+
+If you do not know the `postgres` password, you can set one:
+
+```bash
+psql -U postgres
+```
+
+Then inside the PostgreSQL prompt:
+
+```sql
+ALTER USER postgres WITH PASSWORD 'your_password';
+\q
+```
+
+On Linux, you may need to run the prompt as the `postgres` system user:
+
+```bash
+sudo -u postgres psql
+```
+
+If your local PostgreSQL setup uses your computer username instead of `postgres`, create the database under that user and use a URL like:
+
+```env
+DATABASE_URL=postgresql://localhost:5432/pathfinder
+```
 
 ## Installation
 
