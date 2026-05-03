@@ -43,6 +43,7 @@
 
 .advisor-refresh,
 .advisor-logout,
+/* Buttons, cards, and panels are intentionally dense for advisor triage work. */
 .advisor-alert-actions button {
   border: 1px solid #475569;
   border-radius: 6px;
@@ -550,4 +551,137 @@
     padding-left: 0;
     padding-top: 14px;
   }
+}
+
+/* Bright workspace theme overrides the original dark triage surface. */
+.advisor-dashboard {
+  background:
+    radial-gradient(circle at top right, rgba(20, 184, 166, 0.16), transparent 30rem),
+    linear-gradient(180deg, #f8fcff 0%, #edf7ff 100%);
+  color: #0f172a;
+}
+
+.advisor-kicker {
+  color: #0f766e;
+}
+
+.advisor-header h1,
+.advisor-section-heading h2,
+.advisor-student-card h3,
+.advisor-detail-card h3,
+.advisor-detail-alert strong,
+.advisor-alert-card h3,
+.advisor-student-panel h4 {
+  color: #0f172a;
+}
+
+.advisor-header p,
+.advisor-stats p,
+.advisor-section-heading p,
+.advisor-alert-card p,
+.advisor-student-panel p,
+.advisor-student-card p,
+.advisor-note-actions span,
+.advisor-note-empty,
+.advisor-note-item span,
+.advisor-detail-alert p,
+.advisor-detail-alert span {
+  color: #64748b;
+}
+
+.advisor-refresh,
+.advisor-logout,
+.advisor-alert-actions button,
+.advisor-note-toggle,
+.advisor-detail-button,
+.advisor-detail-close,
+.advisor-note-actions button {
+  background: #ffffff;
+  border-color: #b8c7d9;
+  color: #0f172a;
+}
+
+.advisor-refresh:hover,
+.advisor-logout:hover,
+.advisor-alert-actions button:hover,
+.advisor-note-toggle:hover,
+.advisor-detail-button:hover,
+.advisor-detail-close:hover,
+.advisor-note-actions button:hover {
+  border-color: #0f766e;
+  color: #0f766e;
+}
+
+.advisor-stats div,
+.advisor-roster,
+.advisor-alerts,
+.advisor-student-card,
+.advisor-detail-view,
+.advisor-detail-card,
+.advisor-note-item,
+.advisor-alert-card {
+  background: rgba(255, 255, 255, 0.92);
+  border-color: #d7e3ef;
+  box-shadow: 0 16px 36px rgba(15, 23, 42, 0.07);
+}
+
+.advisor-stats span {
+  color: #0f766e;
+}
+
+.advisor-roster-metrics span,
+.advisor-detail-metrics span,
+.advisor-alert-meta span,
+.advisor-student-details span {
+  background: #f8fcff;
+  border-color: #cbd5e1;
+  color: #475569;
+}
+
+.advisor-note-panel,
+.advisor-student-panel {
+  border-color: #d7e3ef;
+}
+
+.advisor-note-panel textarea,
+.advisor-detail-notes textarea {
+  background: #ffffff;
+  border-color: #cbd5e1;
+  color: #0f172a;
+}
+
+.advisor-note-panel textarea:focus,
+.advisor-detail-notes textarea:focus {
+  border-color: #0f766e;
+  box-shadow: 0 0 0 4px rgba(15, 118, 110, 0.12);
+}
+
+.advisor-detail-alert {
+  background: #f8fcff;
+  border-color: #d7e3ef;
+  border-left-color: #0ea5e9;
+}
+
+.advisor-action-note,
+.advisor-note-item p {
+  color: #334155 !important;
+}
+
+.advisor-alert-actions .resolve {
+  background: #ecfdf5;
+  border-color: #99f6e4;
+  color: #0f766e;
+}
+
+.advisor-error,
+.advisor-empty {
+  background: rgba(255, 255, 255, 0.74);
+  border-color: #d7e3ef;
+  color: #64748b;
+}
+
+.advisor-error {
+  background: #fff1f2;
+  border-color: #fecdd3;
+  color: #9f1239;
 }

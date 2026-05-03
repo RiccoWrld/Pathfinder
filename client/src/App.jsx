@@ -7,6 +7,7 @@ import "./App.css";
 
 const getStoredUser = () => {
   try {
+    // Keep users signed in after a page refresh.
     const storedUser = localStorage.getItem("user");
     return storedUser ? JSON.parse(storedUser) : null;
   } catch {
@@ -21,7 +22,7 @@ function App() {
   const [view, setView] = useState("login");
 
   const handleLogin = (userData) => {
-    // userData contains the id, role, and university_id from your database
+    // userData contains the ids and role the app needs to choose a dashboard.
     setUser(userData);
     localStorage.setItem("user", JSON.stringify(userData));
     setIsLoggedIn(true);
@@ -37,6 +38,7 @@ function App() {
 
   const updateStudentProfile = (profileData) => {
     setUser((prevUser) => {
+      // Audit uploads can update GPA, progress, advisor, and university details.
       const nextUser = { ...prevUser, ...profileData };
       localStorage.setItem("user", JSON.stringify(nextUser));
       return nextUser;
@@ -50,6 +52,7 @@ function App() {
 
       {!isLoggedIn ? (
         <div className="auth-page">
+          {/* Shared brand panel keeps login and signup feeling like one experience. */}
           <aside className="auth-brand-panel">
             <div className="auth-brand">
               <img src="/PathfinderLogo.png" alt="Pathfinder" />
@@ -96,7 +99,10 @@ function App() {
           </section>
         </div>
       ) : user?.role === "advisor" ? (
-        <AdvisorDashboard user={user} onLogout={handleLogout} />
+        <>
+          {/* Route advisors and students to different workspaces after login. */}
+          <AdvisorDashboard user={user} onLogout={handleLogout} />
+        </>
       ) : (
         <StudentDashboard
           user={user}

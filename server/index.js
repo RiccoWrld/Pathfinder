@@ -11,9 +11,11 @@ const universityRoutes = require("./routes/universities");
 
 const app = express();
 
+// The React app is served separately during development, so CORS stays open here.
 app.use(cors());
 app.use(express.json());
 
+// Group every backend feature behind the same /api prefix for the frontend.
 app.use("/api", universityRoutes);
 app.use("/api", authRoutes);
 app.use("/api", alertRoutes);

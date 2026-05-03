@@ -1,12 +1,15 @@
 .dashboard-grid {
+  /* Student view keeps notifications and chat side-by-side on desktop. */
   position: relative;
   display: grid;
   grid-template-columns: 1fr 400px;
   gap: 30px;
   padding: 76px 40px 40px;
   min-height: 80vh;
-  background-color: #0f172a;
-  color: white;
+  background:
+    radial-gradient(circle at top right, rgba(20, 184, 166, 0.18), transparent 28rem),
+    linear-gradient(180deg, #f8fcff 0%, #edf7ff 100%);
+  color: #0f172a;
 }
 
 .left-panel {
@@ -25,19 +28,21 @@
 .welcome-banner h1 {
   font-size: 2.5rem;
   margin-bottom: 0.5rem;
-  color: #f8fafc;
+  color: #0f172a;
 }
 
 .welcome-banner p {
-  color: #94a3b8;
+  color: #4f6f8f;
   font-size: 1.1rem;
 }
 
 .degree-progress {
-  background: #1e293b;
+  /* Requirement progress card mirrors the DegreeWorks progress percentage. */
+  background: rgba(255, 255, 255, 0.9);
   padding: 20px;
   border-radius: 12px;
-  border: 1px solid #334155;
+  border: 1px solid #d7e3ef;
+  box-shadow: 0 18px 42px rgba(15, 23, 42, 0.08);
 }
 
 .progress-heading {
@@ -52,13 +57,13 @@
 }
 
 .progress-heading strong {
-  color: #f8fafc;
+  color: #0f766e;
   font-size: 1.35rem;
 }
 
 .progress-bar-container {
   width: 100%;
-  background-color: #334155;
+  background-color: #dbeafe;
   border-radius: 20px;
   height: 25px;
   margin-top: 15px;
@@ -67,7 +72,7 @@
 
 .progress-fill {
   height: 100%;
-  background: linear-gradient(90deg, #6366f1, #a855f7);
+  background: linear-gradient(90deg, #0f766e, #38bdf8);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -77,31 +82,31 @@
 }
 
 .progress-fill.pending {
-  background: #475569;
-  color: #cbd5e1;
+  background: #cbd5e1;
+  color: #334155;
 }
 
 .missing-requirements {
   margin-top: 18px;
   padding-top: 16px;
-  border-top: 1px solid #334155;
+  border-top: 1px solid #d7e3ef;
 }
 
 .missing-requirements h4 {
   margin: 0 0 10px;
-  color: #f8fafc;
+  color: #0f172a;
   font-size: 0.95rem;
 }
 
 .missing-requirements p {
   margin: 8px 0 0;
-  color: #cbd5e1;
+  color: #475569;
   font-size: 0.86rem;
   line-height: 1.45;
 }
 
 .progress-note {
-  color: #cbd5e1;
+  color: #64748b;
   font-size: 0.9rem;
   margin: 4px 0 0;
 }
@@ -111,18 +116,18 @@
   top: 24px;
   right: 40px;
   z-index: 2;
-  background: #1e293b;
-  border: 1px solid #475569;
+  background: #ffffff;
+  border: 1px solid #b8c7d9;
   border-radius: 6px;
-  color: #f8fafc;
+  color: #0f172a;
   cursor: pointer;
   font-weight: 700;
   padding: 9px 14px;
 }
 
 .dashboard-logout:hover {
-  border-color: #a855f7;
-  color: #d8b4fe;
+  border-color: #0f766e;
+  color: #0f766e;
 }
 
 @media (max-width: 860px) {

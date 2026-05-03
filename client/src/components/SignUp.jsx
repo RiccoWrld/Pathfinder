@@ -12,8 +12,8 @@ const Signup = ({ onSignupSuccess }) => {
   const [universities, setUniversities] = useState([]);
   const [message, setMessage] = useState('');
 
-  // Fetch the list of schools from your new backend route
   useEffect(() => {
+    // Signup must know the school before it can create a student/advisor profile.
     fetch('http://localhost:5000/api/universities')
       .then(res => res.json())
       .then(data => setUniversities(data))
@@ -23,6 +23,7 @@ const Signup = ({ onSignupSuccess }) => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     try {
+      // The backend creates both the login record and role-specific profile.
       const response = await fetch('http://localhost:5000/api/auth/signup', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },

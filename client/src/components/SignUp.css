@@ -1,1 +1,2 @@
+/* Signup intentionally reuses the login form system for a consistent auth flow. */
 @import './Login.css';

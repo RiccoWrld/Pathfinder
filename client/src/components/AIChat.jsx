@@ -11,6 +11,7 @@ const AIChat = ({ user, onStudentProfileUpdate, onAlertsSynced }) => {
   const messagesEndRef = useRef(null);
 
   useEffect(() => {
+    // Keep the latest chat turn visible while the advisor is responding.
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, isLoading]);
 
@@ -31,6 +32,7 @@ const AIChat = ({ user, onStudentProfileUpdate, onAlertsSynced }) => {
     setFile(null);
     setIsLoading(true);
 
+    // FormData lets us send the PDF and the chat message in the same request.
     const formData = new FormData();
     formData.append("message", currentInput || "Please audit my progress.");
     formData.append("history", JSON.stringify(nextMessages));
@@ -50,11 +52,13 @@ const AIChat = ({ user, onStudentProfileUpdate, onAlertsSynced }) => {
       }
 
       if (data.auditContext) {
+        // Store parsed audit text so follow-up questions do not require re-uploading.
         setAuditContext(data.auditContext);
         setHasAudit(true);
       }
 
       if (data.auditSummary && onStudentProfileUpdate) {
+        // The backend parser returns dashboard-friendly facts from DegreeWorks.
         const profileUpdate = {};
 
         if (Number.isFinite(data.auditSummary.completion_rate)) {
@@ -91,11 +95,13 @@ const AIChat = ({ user, onStudentProfileUpdate, onAlertsSynced }) => {
         }
 
         if (Object.keys(profileUpdate).length > 0) {
+          // Push audit-derived profile changes up to App so localStorage stays current.
           onStudentProfileUpdate(profileUpdate);
         }
       }
 
       if (data.alertSync?.synced && onAlertsSynced) {
+        // A new audit may create or clear alerts, so refresh the notification list.
         onAlertsSynced();
       }
 

@@ -1,10 +1,12 @@
 const express = require("express");
 const pool = require("../db");
+const { ensureCurrentProfileAlerts } = require("../services/alertSync");
 
 const router = express.Router();
 
 router.post("/system/check-alerts", async (req, res) => {
   try {
+    // Batch-create GPA alerts for students who do not already have active alerts.
     await pool.query(`
       INSERT INTO alerts (
         student_id,
@@ -35,16 +37,20 @@ router.post("/system/check-alerts", async (req, res) => {
 });
 
 router.get("/alerts/:studentId", async (req, res) => {
+  // Older frontend paths can still resolve to the current student-alert endpoint.
   res.redirect(307, `/api/students/${req.params.studentId}/alerts`);
 });
 
 router.get("/students/:studentId/alerts", async (req, res) => {
   try {
+    await ensureCurrentProfileAlerts(pool, { studentId: req.params.studentId });
+
     const result = await pool.query(
       `SELECT *
        FROM alerts
        WHERE student_id = $1 AND is_resolved = false
        ORDER BY
+         -- High-priority items should always be seen first.
          CASE priority
            WHEN 'high' THEN 1
            WHEN 'medium' THEN 2
@@ -61,6 +67,7 @@ router.get("/students/:studentId/alerts", async (req, res) => {
 });
 
 router.post("/alerts", async (req, res) => {
+  // Manual alerts are useful for advisor-created follow-up items.
   const {
     student_id,
     advisor_id,
@@ -111,6 +118,7 @@ router.post("/alerts", async (req, res) => {
 
 router.patch("/alerts/:alertId/acknowledge", async (req, res) => {
   try {
+    // Acknowledged alerts stay active, but the UI can show that someone saw them.
     const result = await pool.query(
       `UPDATE alerts
        SET status = 'acknowledged',
@@ -132,6 +140,7 @@ router.patch("/alerts/:alertId/acknowledge", async (req, res) => {
 
 router.patch("/alerts/:alertId/resolve", async (req, res) => {
   try {
+    // Resolved alerts are hidden from active student and advisor dashboards.
     const result = await pool.query(
       `UPDATE alerts
        SET status = 'resolved',

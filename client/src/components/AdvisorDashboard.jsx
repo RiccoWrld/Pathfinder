@@ -15,6 +15,7 @@ const formatDateTime = (value) => {
 };
 
 const AdvisorDashboard = ({ user, onLogout }) => {
+  // Advisors can arrive with either the advisor profile id or the base user id.
   const advisorId = user?.advisor_id || user?.id;
   const [alerts, setAlerts] = useState([]);
   const [students, setStudents] = useState([]);
@@ -32,6 +33,7 @@ const AdvisorDashboard = ({ user, onLogout }) => {
       return { alerts: [], students: [] };
     }
 
+    // Alerts and roster are independent, so load them together.
     const [alertsResponse, studentsResponse] = await Promise.all([
       fetch(`http://localhost:5000/api/advisors/${advisorId}/alerts`),
       fetch(`http://localhost:5000/api/advisors/${advisorId}/students`),
@@ -73,6 +75,7 @@ const AdvisorDashboard = ({ user, onLogout }) => {
   useEffect(() => {
     let isCurrent = true;
 
+    // isCurrent prevents setting state if the component unmounts mid-request.
     const loadInitialAlerts = async () => {
       try {
         const nextData = await requestDashboardData();
@@ -113,9 +116,11 @@ const AdvisorDashboard = ({ user, onLogout }) => {
 
       setAlerts(prev => {
         if (action === 'resolve') {
+          // Resolved alerts leave the advisor's active queue immediately.
           return prev.filter(alert => alert.id !== alertId);
         }
 
+        // Acknowledged alerts remain in the queue with an updated status.
         return prev.map(alert => alert.id === alertId ? updatedAlert : alert);
       });
     } catch {
@@ -124,6 +129,7 @@ const AdvisorDashboard = ({ user, onLogout }) => {
   };
 
   const loadStudentNotes = async (studentId) => {
+    // Notes are cached per student so expanding the same panel is instant later.
     if (!advisorId || notesByStudent[studentId]) return;
 
     try {
@@ -149,6 +155,7 @@ const AdvisorDashboard = ({ user, onLogout }) => {
     setExpandedStudentId(prev => {
       const nextStudentId = prev === studentId ? null : studentId;
       if (nextStudentId) {
+        // Load notes only when the advisor actually opens the panel.
         loadStudentNotes(nextStudentId);
       }
       return nextStudentId;
@@ -220,6 +227,7 @@ const AdvisorDashboard = ({ user, onLogout }) => {
   };
 
   const stats = useMemo(() => {
+    // Dashboard cards are derived from the currently active alert list.
     const highPriority = alerts.filter(alert => alert.priority === 'high').length;
     const acknowledged = alerts.filter(alert => alert.status === 'acknowledged').length;
 
@@ -233,6 +241,7 @@ const AdvisorDashboard = ({ user, onLogout }) => {
 
   const sortedAlerts = useMemo(() => {
     return [...alerts].sort((a, b) => {
+      // Sort by urgency first, then newest alert.
       const priorityDifference =
         (priorityRank[a.priority] || 4) - (priorityRank[b.priority] || 4);
 
@@ -248,6 +257,7 @@ const AdvisorDashboard = ({ user, onLogout }) => {
 
   const selectedStudentAlerts = useMemo(() => {
     if (!selectedStudent) return [];
+    // Detail view reuses the same sorted alert list, scoped to one student.
     return sortedAlerts.filter(alert => alert.student_id === selectedStudent.id);
   }, [selectedStudent, sortedAlerts]);
 

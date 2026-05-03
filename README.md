@@ -1,6 +1,6 @@
 # Pathfinder
 
-Pathfinder is a full-stack academic advising platform that helps students and advisors turn DegreeWorks audit data into clear, actionable academic guidance. Students can upload an audit PDF, ask an AI advisor questions about their progress, view degree completion updates, and receive alerts about academic standing or missing requirements. Advisors can review their assigned students, prioritize alerts, acknowledge or resolve cases, and maintain follow-up notes.
+Pathfinder is a full-stack academic advising platform that helps students and advisors turn DegreeWorks audit data into clear, actionable academic guidance. Students can upload an audit PDF, ask an AI advisor questions about their progress, view the DegreeWorks Requirements percentage in a progress bar, and receive alerts about academic standing or missing requirements. Advisors can review their assigned students, prioritize alerts, acknowledge or resolve cases, and maintain follow-up notes.
 
 ## Table of Contents
 
@@ -26,7 +26,7 @@ Pathfinder is designed for academic advising workflows where students need help 
 
 Core goals:
 
-- Help students understand academic standing, degree progress, in-progress courses, and missing requirements.
+- Help students understand academic standing, DegreeWorks Requirements progress, in-progress courses, and missing requirements.
 - Generate alerts from DegreeWorks audits so students and advisors can act quickly.
 - Give advisors a dashboard for active cases, student progress, and advising notes.
 - Keep audit-derived responses grounded in uploaded audit text instead of guessed degree rules.
@@ -45,7 +45,7 @@ Core goals:
 ### Student Dashboard
 
 - Personalized student landing page.
-- Degree completion progress display.
+- DegreeWorks Requirements percentage progress display.
 - DegreeWorks PDF upload.
 - AI advisor chat for audit-specific questions.
 - Student alert center for active academic notifications.
@@ -59,7 +59,7 @@ Core goals:
 - Audit summary extraction for:
   - Overall or cumulative GPA.
   - Academic standing.
-  - Degree completion percentage.
+  - DegreeWorks Requirements percentage, such as the `98% Requirements` value shown in the DegreeWorks Degree Progress area.
   - University name.
   - Advisor name and email.
   - In-progress requirements.
@@ -106,7 +106,7 @@ Core goals:
 - Responsive student dashboard.
 - Advisor dashboard optimized for scanning and triage.
 - Alert cards with priority and status styling.
-- Degree progress visualization.
+- DegreeWorks Requirements progress-bar visualization.
 
 ## Tech Stack
 
@@ -167,7 +167,8 @@ Pathfinder/
 |   |-- services/
 |   |   |-- advisorMatcher.js
 |   |   |-- alertSync.js
-|   |   `-- auditParser.js
+|   |   |-- auditParser.js
+|   |   `-- schemaGuards.js
 |   |-- utils/
 |   |   `-- chatHistory.js
 |   |-- db.js
@@ -246,6 +247,16 @@ The backend expects tables for:
 - `advisor_notes`
 
 It also expects student/advisor university fields and audit progress fields used by the dashboard and alert sync. If your local database was created before those fields existed, update the schema before running the newest backend.
+
+Important student progress columns:
+
+- `completion_rate`: stores the DegreeWorks Requirements percentage displayed in the student dashboard progress bar.
+- `requirement_completed_count`
+- `requirement_in_progress_count`
+- `requirement_missing_count`
+- `requirement_total_count`
+
+The backend includes a small schema guard that can automatically add the requirement count columns if an older local database is missing them. Running `setup.sql` is still the recommended way to keep the whole schema current.
 
 ## Installation
 
@@ -449,6 +460,8 @@ All backend routes are mounted under `/api`.
 | Method | Route | Description |
 | --- | --- | --- |
 | `POST` | `/api/ai/advisor` | Accepts chat input and optional DegreeWorks PDF upload, extracts audit context, syncs alerts, and returns an AI advisor response. |
+
+The AI advisor route also parses the DegreeWorks Degree Progress section. When the audit text contains a value such as `98% Requirements`, that value is returned as `auditSummary.completion_rate`, saved on the student profile, and displayed in the student dashboard progress bar.
 
 ### Alerts
 

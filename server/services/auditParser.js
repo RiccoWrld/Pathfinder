@@ -1,6 +1,7 @@
 const MAX_AUDIT_CONTEXT_CHARS = 90000;
 
 const normalizeAuditText = (text = "") => {
+  // Normalize PDF text before both regex parsing and AI prompting.
   return text
     .replace(/\r/g, "\n")
     .replace(/[ \t]+/g, " ")
@@ -27,6 +28,8 @@ const extractPercentNear = (text, labels) => {
 };
 
 const extractRequirementCompletion = (text) => {
+  // DegreeWorks prints the requirement donut like:
+  // "Degree progress 98% Requirements 100 % Credits".
   const patterns = [
     /Degree\s*progress[\s\S]{0,120}?(\d{1,3})(?:\.\d+)?\s*%\s*Requirements/i,
     /(\d{1,3})(?:\.\d+)?\s*%\s*Requirements/i,
@@ -42,6 +45,7 @@ const extractRequirementCompletion = (text) => {
 };
 
 const extractCreditCompletion = (text) => {
+  // Some audits do not expose a percent, so credits can be a fallback.
   const patterns = [
     {
       regex: /(?:credits?\s*(?:applied|earned|completed)|applied\s*credits?|earned\s*credits?|completed\s*credits?)[^\d]{0,30}(\d+(?:\.\d+)?)[^\n]{0,80}(?:credits?\s*(?:required|needed)|required\s*credits?|total\s*credits?)[^\d]{0,30}(\d+(?:\.\d+)?)/i,
@@ -72,6 +76,7 @@ const extractCreditCompletion = (text) => {
 };
 
 const extractUniversityFromAudit = (text) => {
+  // Prefer an explicit institution field, then fall back to a header line.
   const explicitMatch = text.match(
     /(?:university|institution|college|school)\s*(?:name)?\s*[:\-]\s*([^\n]+)/i,
   );
@@ -100,6 +105,7 @@ const cleanAuditLineValue = (value = "") => {
 };
 
 const extractAdvisorFromAudit = (text = "") => {
+  // Advisor data is useful for assigning the student to the right dashboard.
   const advisorLine = text
     .split("\n")
     .map((line) => line.trim())
@@ -167,6 +173,7 @@ const extractMissingRequirements = (text = "") => {
   const candidates = [];
   const lines = text.split("\n").map((line) => line.trim()).filter(Boolean);
 
+  // DegreeWorks usually marks missing items with "Still Needed" or "Not Complete".
   lines.forEach((line, index) => {
     const isMissingLine = /\b(still needed|unmet|not complete)\b/i.test(line);
     if (!isMissingLine) return;
@@ -220,6 +227,8 @@ const countMatchingLines = (lines, matcher) => {
 };
 
 const extractRequirementProgress = (text = "", missingRequirements = []) => {
+  // These counts are secondary metadata; the dashboard percent comes from
+  // DegreeWorks' own Requirements percentage when it is available.
   const lines = text
     .split("\n")
     .map((line) => line.trim())
@@ -265,6 +274,7 @@ const extractAuditSummary = (auditText = "") => {
   if (!auditText) return {};
 
   const missingRequirements = extractMissingRequirements(auditText);
+  // completion_rate intentionally tracks the DegreeWorks Requirements percent.
   const completionRate =
     extractRequirementCompletion(auditText) ??
     extractPercentNear(auditText, [

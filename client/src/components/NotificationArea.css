@@ -1,9 +1,11 @@
+/* Student alerts use compact cards because this panel sits beside progress info. */
 .notification-area {
   margin: 24px auto;
   padding: 16px;
-  background: var(--code-bg);
+  background: rgba(255, 255, 255, 0.92);
   border-radius: 12px;
   border: 1px solid var(--border);
+  box-shadow: 0 18px 42px rgba(15, 23, 42, 0.08);
   max-width: 600px;
 }
 
@@ -22,7 +24,7 @@
   gap: 16px;
   padding: 14px 16px;
   margin: 10px 0;
-  background: var(--bg);
+  background: #f8fcff;
   border: 1px solid var(--border);
   border-radius: 8px;
   transition: transform 0.2s;
@@ -33,7 +35,7 @@
 }
 
 .alert-card.medium {
-  border-left: 4px solid var(--accent); 
+  border-left: 4px solid #f59e0b;
 }
 
 .alert-card.low {

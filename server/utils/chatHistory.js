@@ -7,6 +7,7 @@ const parseHistory = (rawHistory, currentMessage) => {
     const parsed = JSON.parse(rawHistory);
     if (!Array.isArray(parsed)) return [];
 
+    // Keep only short, valid chat turns so the model prompt stays manageable.
     const clean = parsed
       .filter((msg) => msg && (msg.role === "user" || msg.role === "assistant"))
       .map((msg) => ({
@@ -18,6 +19,7 @@ const parseHistory = (rawHistory, currentMessage) => {
       .filter((msg) => msg.content);
 
     const lastMessage = clean[clean.length - 1];
+    // The current message is sent separately at the end of the prompt.
     if (
       lastMessage?.role === "user" &&
       lastMessage.content === currentMessage

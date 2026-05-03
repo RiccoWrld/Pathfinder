@@ -15,6 +15,7 @@ const MODEL_NAME = "gemini-2.5-flash";
 const sleep = (ms) => new Promise((res) => setTimeout(res, ms));
 
 const systemPrompt = () => {
+  // Keep this prompt strict because the model should not invent audit facts.
   return `
 ### ROLE
 You are Pathfinder's academic advisor. Your job is to answer student questions with two different modes:
@@ -61,6 +62,7 @@ router.post("/ai/advisor", upload.single("file"), async (req, res) => {
     const message = String(req.body.message || "Analyze my standing.").trim();
     const history = parseHistory(req.body.history, message);
 
+    // Reuse the previous audit context unless the student uploads a fresh PDF.
     let auditContext = normalizeAuditText(req.body.auditContext || "");
     const uploadedAudit = Boolean(req.file);
     if (req.file) {
@@ -68,6 +70,7 @@ router.post("/ai/advisor", upload.single("file"), async (req, res) => {
       auditContext = normalizeAuditText(data.text);
     }
     const auditSummary = extractAuditSummary(auditContext);
+    // Only a new upload should sync alerts; normal chat follow-ups should not.
     const alertSync = uploadedAudit
       ? await syncAuditAlerts(req.body.studentId, auditSummary)
       : { synced: false, alertsCreated: 0 };
@@ -79,6 +82,7 @@ router.post("/ai/advisor", upload.single("file"), async (req, res) => {
 
     const contents = [];
 
+    // Seed the model conversation with the audit as source-of-truth context.
     if (auditContext) {
       contents.push({
         role: "user",
@@ -122,6 +126,7 @@ router.post("/ai/advisor", upload.single("file"), async (req, res) => {
       });
     });
 
+    // The final user turn repeats the grounding rules close to the question.
     contents.push({
       role: "user",
       parts: [
@@ -150,6 +155,7 @@ router.post("/ai/advisor", upload.single("file"), async (req, res) => {
         success = true;
       } catch (err) {
         if (err.status === 429 || err.status === 503) {
+          // Gemini can throttle; a short retry keeps the chat from failing too eagerly.
           attempts++;
           const retryDelaySeconds = err.status === 503 ? 10 * attempts : 30 * attempts;
           console.log(

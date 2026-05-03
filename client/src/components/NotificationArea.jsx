@@ -16,6 +16,7 @@ const NotificationArea = ({ studentId, refreshKey = 0 }) => {
       setLoading(true);
 
       try {
+        // Some older caller paths included a colon, so clean it before the API call.
         const cleanId = String(studentId).replace(':', '');
         const response = await fetch(`http://localhost:5000/api/students/${cleanId}/alerts`);
         const data = await response.json();
@@ -43,9 +44,11 @@ const NotificationArea = ({ studentId, refreshKey = 0 }) => {
 
       setAlerts(prev => {
         if (action === 'resolve') {
+          // Resolved alerts should disappear from the active notification list.
           return prev.filter(alert => alert.id !== alertId);
         }
 
+        // Acknowledged alerts remain visible but show their new status.
         return prev.map(alert => alert.id === alertId ? updatedAlert : alert);
       });
     } catch (error) {

@@ -8,6 +8,7 @@ const Login = ({ onLoginSuccess }) => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     try {
+      // Login returns the JWT plus the role-specific profile used by App.
       const response = await fetch('http://localhost:5000/api/auth/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -17,7 +18,7 @@ const Login = ({ onLoginSuccess }) => {
       const data = await response.json();
       
       if (response.ok) {
-        // Store the token and user info for the session
+        // Store the token and user info for the current browser session.
         localStorage.setItem('token', data.token);
         localStorage.setItem('user', JSON.stringify(data.user));
         onLoginSuccess(data.user);

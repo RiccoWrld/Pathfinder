@@ -1,11 +1,15 @@
 const express = require("express");
 const pool = require("../db");
 const { ensureRequirementProgressColumns } = require("../services/schemaGuards");
+const { ensureCurrentProfileAlerts } = require("../services/alertSync");
 
 const router = express.Router();
 
 router.get("/advisors/:advisorId/alerts", async (req, res) => {
   try {
+    await ensureCurrentProfileAlerts(pool, { advisorId: req.params.advisorId });
+
+    // Advisor alert cards need both alert details and the student context.
     const result = await pool.query(
       `SELECT
          alerts.*,
@@ -34,8 +38,11 @@ router.get("/advisors/:advisorId/alerts", async (req, res) => {
 
 router.get("/advisors/:advisorId/students", async (req, res) => {
   try {
+    // Older databases may not have the requirement progress columns yet.
     await ensureRequirementProgressColumns(pool);
+    await ensureCurrentProfileAlerts(pool, { advisorId: req.params.advisorId });
 
+    // Alert counts are calculated in SQL so the dashboard can sort by urgency.
     const result = await pool.query(
       `SELECT
          students.id,

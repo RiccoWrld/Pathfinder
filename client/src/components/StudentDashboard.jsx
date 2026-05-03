@@ -5,6 +5,7 @@ import './StudentDashboard.css';
 
 const StudentDashboard = ({ user, onStudentProfileUpdate, onLogout }) => {
   const [alertsRefreshKey, setAlertsRefreshKey] = useState(0);
+  // completion_rate stores the DegreeWorks "Requirements" percentage.
   const requirementsPercent = Number.isFinite(user?.completion_rate)
     ? user.completion_rate
     : null;
@@ -30,6 +31,7 @@ const StudentDashboard = ({ user, onStudentProfileUpdate, onLogout }) => {
         <NotificationArea studentId={studentId} refreshKey={alertsRefreshKey} />
         
         <div className="degree-progress">
+          {/* This bar mirrors the DegreeWorks Requirements donut percentage. */}
           <div className="progress-heading">
             <div>
               <h3>DegreeWorks Requirements</h3>

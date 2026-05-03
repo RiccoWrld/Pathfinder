@@ -1,4 +1,5 @@
 .counter {
+  /* Leftover utility style from the starter app; harmless if unused. */
   font-size: 16px;
   padding: 5px 10px;
   border-radius: 5px;
@@ -71,6 +72,7 @@
 }
 
 .auth-page {
+  /* Two-column auth shell: brand story on the left, form on the right. */
   width: min(1080px, calc(100% - 40px));
   min-height: min(720px, calc(100svh - 64px));
   display: grid;
@@ -213,6 +215,7 @@
 }
 
 @media (max-width: 900px) {
+  /* Stack auth panels on mobile so forms stay wide enough to use comfortably. */
   #center {
     place-content: flex-start;
     padding: 18px 0;

@@ -3,6 +3,8 @@ let requirementProgressColumnsReady = false;
 const ensureRequirementProgressColumns = async (db) => {
   if (requirementProgressColumnsReady) return;
 
+  // Older local databases may not have these columns yet; add them lazily so
+  // audit uploads do not fail before setup.sql is rerun.
   await db.query(`
     ALTER TABLE students
       ADD COLUMN IF NOT EXISTS requirement_completed_count INT,

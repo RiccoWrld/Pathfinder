@@ -8,6 +8,7 @@ let notesTableReady = false;
 const ensureNotesTable = async () => {
   if (notesTableReady) return;
 
+  // Notes were added after the original schema, so create the table lazily too.
   await pool.query(`
     CREATE TABLE IF NOT EXISTS advisor_notes (
       id SERIAL PRIMARY KEY,
@@ -27,6 +28,7 @@ router.get("/students/:studentId/notes", async (req, res) => {
   try {
     await ensureNotesTable();
 
+    // advisorId is optional for viewing, but the dashboard sends it to scope results.
     const result = await pool.query(
       `SELECT
          advisor_notes.id,
@@ -66,6 +68,7 @@ router.post("/students/:studentId/notes", async (req, res) => {
   try {
     await ensureNotesTable();
 
+    // Advisors can only add notes to students currently assigned to them.
     const studentResult = await pool.query(
       "SELECT id FROM students WHERE id = $1 AND advisor_id = $2",
       [studentId, advisorId],
@@ -99,6 +102,7 @@ router.delete("/notes/:noteId", async (req, res) => {
   try {
     await ensureNotesTable();
 
+    // Delete is scoped by advisorId so one advisor cannot delete another's notes.
     const result = await pool.query(
       `DELETE FROM advisor_notes
        WHERE id = $1 AND advisor_id = $2

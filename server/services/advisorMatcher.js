@@ -1,4 +1,5 @@
 const normalizePersonName = (name) => {
+  // DegreeWorks advisor names are not always formatted the same way as the DB.
   return String(name || "")
     .toLowerCase()
     .replace(/[^a-z\s]/g, " ")
@@ -11,6 +12,7 @@ const matchAdvisorFromAudit = async (client, auditSummary, universityId) => {
   const advisorEmail = auditSummary?.advisor_email;
   const advisorName = normalizePersonName(auditSummary?.advisor_name);
 
+  // Email is the strongest match when the audit includes it.
   if (advisorEmail) {
     const emailResult = await client.query(
       `SELECT id, name, email
@@ -27,6 +29,7 @@ const matchAdvisorFromAudit = async (client, auditSummary, universityId) => {
 
   if (!advisorName) return null;
 
+  // Fall back to a normalized name match inside the student's university.
   const advisorResult = await client.query(
     `SELECT id, name, email
      FROM advisors

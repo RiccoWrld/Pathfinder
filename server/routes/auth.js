@@ -7,6 +7,7 @@ const { ensureRequirementProgressColumns } = require("../services/schemaGuards")
 const router = express.Router();
 
 router.post("/register", async (req, res) => {
+  // Legacy endpoint kept for compatibility with earlier local experiments.
   const { username, password } = req.body;
   try {
     const hashedPassword = await bcrypt.hash(password, 10);
@@ -24,6 +25,7 @@ router.post("/register", async (req, res) => {
 
 router.post("/auth/signup", async (req, res) => {
   const { email, password, role = "student", university_id, name } = req.body;
+  // Normalize account fields before validation so duplicate checks are reliable.
   const normalizedEmail = String(email || "").trim().toLowerCase();
   const normalizedRole = String(role || "student").trim().toLowerCase();
   const normalizedName = String(name || "").trim();
@@ -43,6 +45,7 @@ router.post("/auth/signup", async (req, res) => {
   try {
     await client.query("BEGIN");
 
+    // Create the base login record first, then attach the role-specific profile.
     const hashedPassword = await bcrypt.hash(password, 10);
     const userResult = await client.query(
       `INSERT INTO users (email, password_hash, role, university_id)
@@ -52,6 +55,7 @@ router.post("/auth/signup", async (req, res) => {
     );
 
     const user = userResult.rows[0];
+    // If no name is provided, make a readable profile name from the email prefix.
     const profileName =
       normalizedName ||
       normalizedEmail
@@ -62,6 +66,7 @@ router.post("/auth/signup", async (req, res) => {
     let advisorId = null;
 
     if (normalizedRole === "advisor") {
+      // Advisor accounts get their own advisor profile for dashboard ownership.
       const advisorResult = await client.query(
         `INSERT INTO advisors (name, email, university_id)
          VALUES ($1, $2, $3)
@@ -72,6 +77,7 @@ router.post("/auth/signup", async (req, res) => {
     }
 
     if (normalizedRole === "student") {
+      // New students are assigned to the first advisor at their university when available.
       const advisorResult = await client.query(
         `SELECT id
          FROM advisors
@@ -117,8 +123,10 @@ router.post("/auth/signup", async (req, res) => {
 router.post("/auth/login", async (req, res) => {
   const { email, password } = req.body;
   try {
+    // Make sure older databases can support the latest dashboard fields.
     await ensureRequirementProgressColumns(pool);
 
+    // The joins return everything the frontend needs to choose the right dashboard.
     const user = await pool.query(
       `SELECT
          users.*,
