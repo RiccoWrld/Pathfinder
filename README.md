@@ -147,12 +147,20 @@ Pathfinder/
 |   |-- src/
 |   |   |-- components/
 |   |   |   |-- AdvisorDashboard.jsx
+|   |   |   |-- AdvisorDashboard.css
 |   |   |   |-- AIChat.jsx
+|   |   |   |-- AIChat.css
 |   |   |   |-- Login.jsx
+|   |   |   |-- Login.css
 |   |   |   |-- NotificationArea.jsx
+|   |   |   |-- NotificationArea.css
 |   |   |   |-- SignUp.jsx
-|   |   |   `-- StudentDashboard.jsx
+|   |   |   |-- SignUp.css
+|   |   |   |-- StudentDashboard.jsx
+|   |   |   `-- StudentDashboard.css
+|   |   |-- App.css
 |   |   |-- App.jsx
+|   |   |-- index.css
 |   |   `-- main.jsx
 |   |-- package.json
 |   `-- vite.config.js
