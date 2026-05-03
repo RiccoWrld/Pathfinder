@@ -207,7 +207,7 @@ git --version
 
 ## Environment Variables
 
-Create a `.env` file inside the `server` directory:
+Create a `.env` file inside the `server` directory. This file is intentionally not committed to the repository because it contains private secrets and machine-specific database credentials.
 
 ```env
 PORT=5000
@@ -216,18 +216,60 @@ JWT_SECRET=replace_with_a_long_random_secret
 GEMINI_API_KEY=replace_with_your_gemini_api_key
 ```
 
+### How to Create `DATABASE_URL`
+
+Each developer needs their own PostgreSQL connection string. Do not share your personal database password or commit a real `DATABASE_URL` to GitHub.
+
+Connection string format:
+
+```text
+postgresql://USERNAME:PASSWORD@HOST:PORT/DATABASE_NAME
+```
+
+Local PostgreSQL example:
+
+```env
+DATABASE_URL=postgresql://postgres:your_password@localhost:5432/pathfinder
+```
+
+If your PostgreSQL username is `postgres`, your password is `admin123`, and your database is named `pathfinder`, then use:
+
+```env
+DATABASE_URL=postgresql://postgres:admin123@localhost:5432/pathfinder
+```
+
+If PostgreSQL was installed without a password for your local user, the connection string may look more like:
+
+```env
+DATABASE_URL=postgresql://localhost:5432/pathfinder
+```
+
+For a hosted PostgreSQL database such as Render, Supabase, Neon, Railway, or another cloud provider, copy the provider's PostgreSQL connection URL and paste it as `DATABASE_URL`. Hosted URLs usually include a remote host name and often require SSL.
+
 Variable details:
 
 | Variable | Required | Description |
 | --- | --- | --- |
 | `PORT` | No | Backend port. Defaults to `5000`. |
-| `DATABASE_URL` | Yes | PostgreSQL connection string used by the backend. |
+| `DATABASE_URL` | Yes | PostgreSQL connection string used by the backend. Each computer or cloud environment needs its own value. |
 | `JWT_SECRET` | Recommended | Secret used to sign JWT tokens. The app has a fallback, but production should always set this. |
 | `GEMINI_API_KEY` | Yes for AI chat | Google Gemini API key used by the AI advisor route. |
 
+Generate a stronger `JWT_SECRET` with one of these commands:
+
+```bash
+node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
+```
+
+Windows PowerShell:
+
+```powershell
+node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
+```
+
 ## Database Setup
 
-Create a local PostgreSQL database:
+Start PostgreSQL, then create a local database named `pathfinder`:
 
 ```bash
 createdb pathfinder
@@ -243,6 +285,30 @@ If your database requires a username:
 
 ```bash
 psql -U postgres -d pathfinder -f setup.sql
+```
+
+If your database uses a password, PostgreSQL will prompt for it. You can also connect with the full connection string:
+
+```bash
+psql "postgresql://postgres:your_password@localhost:5432/pathfinder" -f setup.sql
+```
+
+Windows PowerShell:
+
+```powershell
+psql "postgresql://postgres:your_password@localhost:5432/pathfinder" -f setup.sql
+```
+
+If you are using a hosted database, run the same setup script against the hosted URL:
+
+```bash
+psql "$DATABASE_URL" -f setup.sql
+```
+
+Windows PowerShell:
+
+```powershell
+psql $env:DATABASE_URL -f setup.sql
 ```
 
 The backend expects tables for:
@@ -265,6 +331,16 @@ Important student progress columns:
 - `requirement_total_count`
 
 The backend includes a small schema guard that can automatically add the requirement count columns if an older local database is missing them. Running `setup.sql` is still the recommended way to keep the whole schema current.
+
+### Blank Database vs Demo Data
+
+`setup.sql` creates the schema and may include demo university, advisor, student, user, alert, and note records for testing. For a clean classroom or production-style setup, remove or skip the demo `INSERT INTO users`, `INSERT INTO advisors`, `INSERT INTO students`, `INSERT INTO alerts`, and `INSERT INTO advisor_notes` statements before running it, or clear those tables after setup:
+
+```sql
+TRUNCATE TABLE advisor_notes, alerts, students, advisors, users RESTART IDENTITY CASCADE;
+```
+
+Keep the `universities` rows unless you want users to create accounts without preloaded university options.
 
 ## Installation
 
@@ -303,6 +379,8 @@ cd server
 npm run dev
 ```
 
+If the backend starts correctly, you should see a message that the server is running on port `5000`.
+
 Start the frontend in a second terminal:
 
 ```bash
@@ -315,6 +393,19 @@ Open the app:
 ```text
 http://localhost:5173
 ```
+
+First-run checklist:
+
+1. Confirm PostgreSQL is running.
+2. Confirm `server/.env` exists.
+3. Confirm `DATABASE_URL` points to a database that exists.
+4. Run `setup.sql`.
+5. Start the backend.
+6. Start the frontend.
+7. Create an advisor account.
+8. Create a student account at the same university.
+9. Upload a DegreeWorks PDF from the student dashboard.
+10. Confirm alerts and progress appear on both dashboards.
 
 For production-style frontend testing:
 
@@ -334,23 +425,45 @@ cd Pathfinder
 
 cd server
 npm install
+```
+
+Create `server\.env`:
+
+```powershell
 New-Item -ItemType File -Path .env
+notepad .env
+```
+
+Add your values:
+
+```env
+PORT=5000
+DATABASE_URL=postgresql://postgres:your_password@localhost:5432/pathfinder
+JWT_SECRET=replace_with_a_long_random_secret
+GEMINI_API_KEY=replace_with_your_gemini_api_key
+```
+
+Create and initialize the database from the project root:
+
+```powershell
+cd ..
+createdb pathfinder
+psql "postgresql://postgres:your_password@localhost:5432/pathfinder" -f setup.sql
+```
+
+Start the backend:
+
+```powershell
+cd server
 npm run dev
 ```
 
-In another PowerShell window:
+In another PowerShell window, start the frontend:
 
 ```powershell
 cd Pathfinder\client
 npm install
 npm run dev
-```
-
-PostgreSQL setup on Windows:
-
-```powershell
-createdb pathfinder
-psql -d pathfinder -f setup.sql
 ```
 
 If `createdb` or `psql` is not recognized, add the PostgreSQL `bin` folder to your PATH. A common location is:
@@ -374,11 +487,20 @@ Run the project:
 git clone <repository-url>
 cd Pathfinder
 
-createdb pathfinder
-psql -d pathfinder -f setup.sql
-
 cd server
 npm install
+cat > .env <<'EOF'
+PORT=5000
+DATABASE_URL=postgresql://postgres:your_password@localhost:5432/pathfinder
+JWT_SECRET=replace_with_a_long_random_secret
+GEMINI_API_KEY=replace_with_your_gemini_api_key
+EOF
+cd ..
+
+createdb pathfinder
+psql "postgresql://postgres:your_password@localhost:5432/pathfinder" -f setup.sql
+
+cd server
 npm run dev
 ```
 
@@ -404,14 +526,33 @@ Create the database:
 
 ```bash
 sudo -u postgres createdb pathfinder
-psql -d pathfinder -f setup.sql
+```
+
+Create `server/.env`:
+
+```bash
+git clone <repository-url>
+cd Pathfinder/server
+npm install
+cat > .env <<'EOF'
+PORT=5000
+DATABASE_URL=postgresql://postgres:your_password@localhost:5432/pathfinder
+JWT_SECRET=replace_with_a_long_random_secret
+GEMINI_API_KEY=replace_with_your_gemini_api_key
+EOF
+```
+
+Initialize the database from the project root:
+
+```bash
+cd ..
+psql "postgresql://postgres:your_password@localhost:5432/pathfinder" -f setup.sql
 ```
 
 Run the backend:
 
 ```bash
-cd Pathfinder/server
-npm install
+cd server
 npm run dev
 ```
 
