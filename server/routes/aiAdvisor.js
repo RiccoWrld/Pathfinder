@@ -59,6 +59,12 @@ You are Pathfinder's academic advisor. Your job is to answer student questions w
 
 router.post("/ai/advisor", upload.single("file"), async (req, res) => {
   try {
+    if (!API_KEY) {
+      return res.status(503).json({
+        error: "Gemini API key is missing. Add GEMINI_API_KEY to the Docker .env file and restart Pathfinder.",
+      });
+    }
+
     const message = String(req.body.message || "Analyze my standing.").trim();
     const history = parseHistory(req.body.history, message);
 
@@ -172,6 +178,12 @@ router.post("/ai/advisor", upload.single("file"), async (req, res) => {
     res.json({ reply: textResponse, auditContext, auditSummary, alertSync });
   } catch (err) {
     console.error("AI Error:", err);
+    if (err.status === 401 || err.status === 403) {
+      return res.status(503).json({
+        error: "Gemini API key is missing or invalid. Update GEMINI_API_KEY in the Docker .env file and restart Pathfinder.",
+      });
+    }
+
     res.status(500).json({
       error: "Advisor is currently busy. Please try again in 30 seconds.",
     });

@@ -106,8 +106,14 @@ const AIChat = ({ user, onStudentProfileUpdate, onAlertsSynced }) => {
       }
 
       setMessages(prev => [...prev, { role: 'assistant', content: data.reply }]);
-    } catch {
-      setMessages(prev => [...prev, { role: 'assistant', content: "Error connecting to advisor." }]);
+    } catch (error) {
+      setMessages(prev => [
+        ...prev,
+        {
+          role: 'assistant',
+          content: error.message || "Error connecting to advisor.",
+        },
+      ]);
     } finally {
       setIsLoading(false);
     }

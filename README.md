@@ -13,6 +13,7 @@ Pathfinder is a full-stack academic advising platform that helps students and ad
 - [Database Setup](#database-setup)
 - [Installation](#installation)
 - [Running the Project](#running-the-project)
+- [Running with Docker](#running-with-docker)
 - [Operating System Instructions](#operating-system-instructions)
 - [Available Scripts](#available-scripts)
 - [API Overview](#api-overview)
@@ -442,6 +443,81 @@ For production-style frontend testing:
 cd client
 npm run build
 npm run preview
+```
+
+## Running with Docker
+
+Pathfinder can run as a Docker Compose stack, which starts the database, backend API, and frontend app together.
+
+Make sure Docker Desktop is installed and the Docker engine is running before using these commands.
+
+The Docker stack exposes:
+
+- PostgreSQL database: `localhost:5432`
+- Backend API: `http://localhost:5000`
+- Frontend app: `http://localhost:5173`
+
+From the project root, create a local `.env` file from the example:
+
+```bash
+cp .env.example .env
+```
+
+On Windows PowerShell, use:
+
+```powershell
+Copy-Item .env.example .env
+```
+
+Update `.env` with your local secrets:
+
+```env
+JWT_SECRET=replace_with_a_long_random_secret
+GEMINI_API_KEY=replace_with_your_gemini_api_key
+```
+
+`JWT_SECRET` can be any long random private string. `GEMINI_API_KEY` must be a real Google Gemini API key for the AI advisor to answer audit questions.
+
+Start the full stack from the project root:
+
+```bash
+docker compose up --build
+```
+
+Open the app at:
+
+```text
+http://localhost:5173
+```
+
+The first startup can take a little longer because Docker builds the client and server images and initializes PostgreSQL.
+
+To stop the app, press `Ctrl+C` in the terminal running Docker Compose. You can also stop and remove the containers with:
+
+```bash
+docker compose down
+```
+
+The database container automatically runs `setup.sql` the first time the Docker volume is created. If you need to reset the Docker database and seed it again, remove the volume:
+
+```bash
+docker compose down -v
+docker compose up --build
+```
+
+Useful demo credentials seeded by `setup.sql`:
+
+```text
+Advisor: sarah.path@university.edu / password123
+Student: alice.johnson@university.edu / password123
+Student: jordan.smith@university.edu / password123
+```
+
+If login works but the AI advisor says the Gemini key is missing or invalid, update `GEMINI_API_KEY` in `.env`, then restart the stack:
+
+```bash
+docker compose down
+docker compose up --build
 ```
 
 ## Operating System Instructions

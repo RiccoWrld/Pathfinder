@@ -1,0 +1,25 @@
+# Dependencies
+node_modules/
+client/node_modules/
+server/node_modules/
+
+# Environment files
+.env
+*.env
+!.env.example
+client/.env
+server/.env
+
+# Build output
+dist/
+build/
+client/dist/
+
+# Logs and local files
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.DS_Store
+
+# Docker overrides
+docker-compose.override.yml
