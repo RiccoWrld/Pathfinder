@@ -122,6 +122,60 @@
   margin: 0;
 }
 
+.advisor-filters {
+  display: grid;
+  grid-template-columns: minmax(220px, 1fr) minmax(180px, 240px) auto;
+  gap: 12px;
+  align-items: end;
+  margin-bottom: 16px;
+}
+
+.advisor-filter-field {
+  display: grid;
+  gap: 6px;
+}
+
+.advisor-filter-field span {
+  color: #cbd5e1;
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+
+.advisor-filter-field input,
+.advisor-filter-field select {
+  box-sizing: border-box;
+  width: 100%;
+  min-height: 40px;
+  border: 1px solid #475569;
+  border-radius: 6px;
+  background: #0f172a;
+  color: #f8fafc;
+  font: inherit;
+  padding: 8px 10px;
+}
+
+.advisor-filter-field input:focus,
+.advisor-filter-field select:focus {
+  border-color: #38bdf8;
+  outline: none;
+}
+
+.advisor-filter-clear {
+  min-height: 40px;
+  border: 1px solid #475569;
+  border-radius: 6px;
+  background: #1e293b;
+  color: #f8fafc;
+  cursor: pointer;
+  font-weight: 700;
+  padding: 8px 14px;
+}
+
+.advisor-filter-clear:hover {
+  border-color: #38bdf8;
+  color: #7dd3fc;
+}
+
 .advisor-alert-list {
   display: grid;
   gap: 12px;
@@ -521,6 +575,14 @@
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
+  .advisor-filters {
+    grid-template-columns: 1fr;
+  }
+
+  .advisor-filter-clear {
+    width: 100%;
+  }
+
   .advisor-alert-card {
     grid-template-columns: 1fr;
   }
@@ -595,7 +657,8 @@
 .advisor-note-toggle,
 .advisor-detail-button,
 .advisor-detail-close,
-.advisor-note-actions button {
+.advisor-note-actions button,
+.advisor-filter-clear {
   background: #ffffff;
   border-color: #b8c7d9;
   color: #0f172a;
@@ -607,7 +670,8 @@
 .advisor-note-toggle:hover,
 .advisor-detail-button:hover,
 .advisor-detail-close:hover,
-.advisor-note-actions button:hover {
+.advisor-note-actions button:hover,
+.advisor-filter-clear:hover {
   border-color: #0f766e;
   color: #0f766e;
 }
@@ -644,16 +708,24 @@
 }
 
 .advisor-note-panel textarea,
-.advisor-detail-notes textarea {
+.advisor-detail-notes textarea,
+.advisor-filter-field input,
+.advisor-filter-field select {
   background: #ffffff;
   border-color: #cbd5e1;
   color: #0f172a;
 }
 
 .advisor-note-panel textarea:focus,
-.advisor-detail-notes textarea:focus {
+.advisor-detail-notes textarea:focus,
+.advisor-filter-field input:focus,
+.advisor-filter-field select:focus {
   border-color: #0f766e;
   box-shadow: 0 0 0 4px rgba(15, 118, 110, 0.12);
+}
+
+.advisor-filter-field span {
+  color: #475569;
 }
 
 .advisor-detail-alert {

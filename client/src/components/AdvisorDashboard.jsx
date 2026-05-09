@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import './AdvisorDashboard.css';
 
 const priorityRank = { high: 1, medium: 2, low: 3 };
+const priorityOptions = ['high', 'medium', 'low'];
 
 const formatDateTime = (value) => {
   if (!value) return 'Just now';
@@ -27,6 +28,8 @@ const AdvisorDashboard = ({ user, onLogout }) => {
   const [deletingNoteId, setDeletingNoteId] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [studentSearch, setStudentSearch] = useState('');
+  const [priorityFilter, setPriorityFilter] = useState('all');
 
   const requestDashboardData = useCallback(async () => {
     if (!advisorId) {
@@ -251,6 +254,58 @@ const AdvisorDashboard = ({ user, onLogout }) => {
     });
   }, [alerts]);
 
+  const prioritiesByStudent = useMemo(() => {
+    return alerts.reduce((acc, alert) => {
+      const studentId = alert.student_id;
+      const priority = alert.priority || 'medium';
+
+      if (!studentId) return acc;
+
+      if (!acc[studentId]) {
+        acc[studentId] = new Set();
+      }
+
+      acc[studentId].add(priority);
+      return acc;
+    }, {});
+  }, [alerts]);
+
+  const studentMatchesFilters = useCallback((student) => {
+    const normalizedSearch = studentSearch.trim().toLowerCase();
+    const studentName = String(student.name || '').toLowerCase();
+    const matchesName = !normalizedSearch || studentName.includes(normalizedSearch);
+
+    if (!matchesName) return false;
+
+    if (priorityFilter === 'all') return true;
+
+    const studentPriorities = prioritiesByStudent[student.id];
+
+    if (priorityFilter === 'none') {
+      return !studentPriorities || studentPriorities.size === 0;
+    }
+
+    return studentPriorities?.has(priorityFilter);
+  }, [prioritiesByStudent, priorityFilter, studentSearch]);
+
+  const filteredStudents = useMemo(() => {
+    return students.filter(studentMatchesFilters);
+  }, [studentMatchesFilters, students]);
+
+  const filteredAlerts = useMemo(() => {
+    const normalizedSearch = studentSearch.trim().toLowerCase();
+
+    return sortedAlerts.filter((alert) => {
+      const studentName = String(alert.student_name || '').toLowerCase();
+      const matchesName = !normalizedSearch || studentName.includes(normalizedSearch);
+      const matchesPriority = priorityFilter === 'all' || alert.priority === priorityFilter;
+
+      return matchesName && matchesPriority;
+    });
+  }, [priorityFilter, sortedAlerts, studentSearch]);
+
+  const hasActiveFilters = studentSearch.trim() || priorityFilter !== 'all';
+
   const selectedStudent = useMemo(() => {
     return students.find(student => student.id === selectedStudentId) || null;
   }, [selectedStudentId, students]);
@@ -305,11 +360,52 @@ const AdvisorDashboard = ({ user, onLogout }) => {
           <p>All students currently assigned to you.</p>
         </div>
 
+        <div className="advisor-filters" aria-label="Student filters">
+          <label className="advisor-filter-field">
+            <span>Search by name</span>
+            <input
+              type="search"
+              value={studentSearch}
+              placeholder="Student name"
+              onChange={(event) => setStudentSearch(event.target.value)}
+            />
+          </label>
+
+          <label className="advisor-filter-field">
+            <span>Alert priority</span>
+            <select
+              value={priorityFilter}
+              onChange={(event) => setPriorityFilter(event.target.value)}
+            >
+              <option value="all">All priorities</option>
+              {priorityOptions.map(priority => (
+                <option key={priority} value={priority}>
+                  {priority[0].toUpperCase() + priority.slice(1)}
+                </option>
+              ))}
+              <option value="none">No active alerts</option>
+            </select>
+          </label>
+
+          {hasActiveFilters && (
+            <button
+              className="advisor-filter-clear"
+              type="button"
+              onClick={() => {
+                setStudentSearch('');
+                setPriorityFilter('all');
+              }}
+            >
+              Clear
+            </button>
+          )}
+        </div>
+
         {loading ? (
           <p className="advisor-empty">Loading student roster...</p>
-        ) : students.length > 0 ? (
+        ) : filteredStudents.length > 0 ? (
           <div className="advisor-roster-list">
-            {students.map(student => (
+            {filteredStudents.map(student => (
               <article key={student.id} className="advisor-student-card">
                 <div className="advisor-student-summary">
                   <div>
@@ -379,6 +475,8 @@ const AdvisorDashboard = ({ user, onLogout }) => {
               </article>
             ))}
           </div>
+        ) : students.length > 0 ? (
+          <p className="advisor-empty">No students match the current filters.</p>
         ) : (
           <p className="advisor-empty">No students are assigned to you yet.</p>
         )}
@@ -480,9 +578,9 @@ const AdvisorDashboard = ({ user, onLogout }) => {
 
         {loading ? (
           <p className="advisor-empty">Loading advisor alerts...</p>
-        ) : sortedAlerts.length > 0 ? (
+        ) : filteredAlerts.length > 0 ? (
           <div className="advisor-alert-list">
-            {sortedAlerts.map(alert => (
+            {filteredAlerts.map(alert => (
               <article
                 key={alert.id}
                 className={`advisor-alert-card ${alert.priority || 'medium'} ${alert.status || 'active'}`}
@@ -524,6 +622,8 @@ const AdvisorDashboard = ({ user, onLogout }) => {
               </article>
             ))}
           </div>
+        ) : sortedAlerts.length > 0 ? (
+          <p className="advisor-empty">No active advisee alerts match the current filters.</p>
         ) : (
           <p className="advisor-empty">No active advisee alerts right now.</p>
         )}
