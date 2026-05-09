@@ -18,8 +18,24 @@ const addAuditAlert = async (
     handledAuditAlertKeys = new Set(),
   },
 ) => {
-  // If a student or advisor already handled this exact audit finding, keep it quiet.
-  if (handledAuditAlertKeys.has(getAuditAlertKey({ category, title, message }))) {
+  const activeDuplicate = await client.query(
+    `SELECT id
+     FROM alerts
+     WHERE student_id = $1
+       AND is_resolved = false
+       AND source = 'audit'
+       AND category = $2
+       AND title = $3
+       AND message = $4
+     LIMIT 1`,
+    [studentId, category, title, message],
+  );
+
+  // Keep an acknowledged current finding visible without adding a duplicate card.
+  if (
+    activeDuplicate.rows.length > 0 ||
+    handledAuditAlertKeys.has(getAuditAlertKey({ category, title, message }))
+  ) {
     return false;
   }
 
@@ -232,23 +248,10 @@ const syncAuditAlerts = async (studentId, auditSummary) => {
     );
     const advisorId = matchedAdvisor?.id || studentResult.rows[0].advisor_id;
 
-    // Snapshot handled alerts before refreshing current audit alerts.
-    const handledAuditAlertsResult = await client.query(
-      `SELECT category, title, message
-       FROM alerts
-       WHERE student_id = $1
-         AND source = 'audit'
-         AND (
-           is_resolved = true
-           OR status IN ('acknowledged', 'resolved')
-           OR acknowledged_at IS NOT NULL
-           OR resolved_at IS NOT NULL
-         )`,
-      [numericStudentId],
-    );
-    const handledAuditAlertKeys = new Set(
-      handledAuditAlertsResult.rows.map((alert) => getAuditAlertKey(alert)),
-    );
+    // Current audit findings should be reflected on the dashboard even when a
+    // previous upload produced similar resolved alerts. Active duplicates are
+    // checked at insert time so acknowledged cards are not duplicated.
+    const handledAuditAlertKeys = new Set();
 
     if (matchedAdvisor) {
       // If the audit names a known advisor, move active alerts to that advisor too.
@@ -261,8 +264,9 @@ const syncAuditAlerts = async (studentId, auditSummary) => {
       );
     }
 
-    // Audit alerts are regenerated from the latest upload, so old active audit
-    // alerts are resolved before the new set is inserted.
+    // Audit alerts are regenerated from the latest upload, so old unreviewed
+    // audit alerts are resolved before the new set is inserted. Acknowledged
+    // alerts stay active because the dashboards still need to show them.
     await client.query(
       `UPDATE alerts
        SET is_resolved = true,
@@ -270,7 +274,8 @@ const syncAuditAlerts = async (studentId, auditSummary) => {
            resolved_at = COALESCE(resolved_at, NOW())
        WHERE student_id = $1
          AND is_resolved = false
-         AND source = 'audit'`,
+         AND source = 'audit'
+         AND status <> 'acknowledged'`,
       [numericStudentId],
     );
 
