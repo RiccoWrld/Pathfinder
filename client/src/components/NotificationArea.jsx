@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { api } from '../api';
 import './NotificationArea.css';
 
 const NotificationArea = ({ studentId, refreshKey = 0 }) => {
@@ -19,15 +20,8 @@ const NotificationArea = ({ studentId, refreshKey = 0 }) => {
       setError('');
 
       try {
-        // Some older caller paths included a colon, so clean it before the API call.
         const cleanId = String(studentId).replace(':', '');
-        const response = await fetch(`http://localhost:5000/api/students/${cleanId}/alerts`);
-        const data = await response.json();
-
-        if (!response.ok) {
-          throw new Error(data.error || 'Could not load alerts');
-        }
-
+        const data = await api.get(`/students/${cleanId}/alerts`);
         setAlerts(Array.isArray(data) ? data : []);
       } catch (error) {
         console.error("Error fetching alerts:", error);
@@ -43,14 +37,7 @@ const NotificationArea = ({ studentId, refreshKey = 0 }) => {
 
   const updateAlert = async (alertId, action) => {
     try {
-      const response = await fetch(`http://localhost:5000/api/alerts/${alertId}/${action}`, {
-        method: 'PATCH',
-      });
-      const updatedAlert = await response.json();
-
-      if (!response.ok) {
-        throw new Error(updatedAlert.error || `Could not ${action} alert`);
-      }
+      const updatedAlert = await api.patch(`/alerts/${alertId}/${action}`);
 
       setAlerts(prev => {
         if (action === 'resolve') {

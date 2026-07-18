@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { api } from '../api';
 import './SignUp.css';
 
 const Signup = ({ onSignupSuccess }) => {
@@ -13,31 +14,19 @@ const Signup = ({ onSignupSuccess }) => {
   const [message, setMessage] = useState('');
 
   useEffect(() => {
-    // Signup must know the school before it can create a student/advisor profile.
-    fetch('http://localhost:5000/api/universities')
-      .then(res => res.json())
-      .then(data => setUniversities(data))
+    api.get('/universities')
+      .then(data => setUniversities(Array.isArray(data) ? data : []))
       .catch(err => console.error("Error loading universities:", err));
   }, []);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     try {
-      // The backend creates both the login record and role-specific profile.
-      const response = await fetch('http://localhost:5000/api/auth/signup', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(formData),
-      });
-      const data = await response.json();
-      if (response.ok) {
-        setMessage("Signup successful! You can now login.");
-        onSignupSuccess?.();
-      } else {
-        setMessage(data.error || "Signup failed");
-      }
-    } catch {
-      setMessage("Server error. Please try again.");
+      const data = await api.post('/auth/signup', formData);
+      setMessage("Signup successful! You can now login.");
+      onSignupSuccess?.();
+    } catch (err) {
+      setMessage(err.message || "Signup failed");
     }
   };
 

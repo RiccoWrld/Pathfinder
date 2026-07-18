@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { api } from '../api';
 import './Login.css';
 
 const Login = ({ onLoginSuccess }) => {
@@ -8,25 +9,12 @@ const Login = ({ onLoginSuccess }) => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     try {
-      // Login returns the JWT plus the role-specific profile used by App.
-      const response = await fetch('http://localhost:5000/api/auth/login', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(formData),
-      });
-      
-      const data = await response.json();
-      
-      if (response.ok) {
-        // Store the token and user info for the current browser session.
-        localStorage.setItem('token', data.token);
-        localStorage.setItem('user', JSON.stringify(data.user));
-        onLoginSuccess(data.user);
-      } else {
-        setError(data.error || "Login failed");
-      }
-    } catch {
-      setError("Server error. Please try again.");
+      const data = await api.post('/auth/login', formData);
+      localStorage.setItem('token', data.token);
+      localStorage.setItem('user', JSON.stringify(data.user));
+      onLoginSuccess(data.user);
+    } catch (err) {
+      setError(err.message || "Login failed");
     }
   };
 

@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { api } from '../api';
 import './AdvisorDashboard.css';
 
 const priorityRank = { high: 1, medium: 2, low: 3 };
@@ -36,23 +37,10 @@ const AdvisorDashboard = ({ user, onLogout }) => {
       return { alerts: [], students: [] };
     }
 
-    // Alerts and roster are independent, so load them together.
-    const [alertsResponse, studentsResponse] = await Promise.all([
-      fetch(`http://localhost:5000/api/advisors/${advisorId}/alerts`),
-      fetch(`http://localhost:5000/api/advisors/${advisorId}/students`),
-    ]);
     const [alertsData, studentsData] = await Promise.all([
-      alertsResponse.json(),
-      studentsResponse.json(),
+      api.get(`/advisors/${advisorId}/alerts`),
+      api.get(`/advisors/${advisorId}/students`),
     ]);
-
-    if (!alertsResponse.ok) {
-      throw new Error(alertsData.error || 'Could not load advisor alerts');
-    }
-
-    if (!studentsResponse.ok) {
-      throw new Error(studentsData.error || 'Could not load advisor roster');
-    }
 
     return {
       alerts: Array.isArray(alertsData) ? alertsData : [],
@@ -108,14 +96,7 @@ const AdvisorDashboard = ({ user, onLogout }) => {
 
   const updateAlert = async (alertId, action) => {
     try {
-      const response = await fetch(`http://localhost:5000/api/alerts/${alertId}/${action}`, {
-        method: 'PATCH',
-      });
-      const updatedAlert = await response.json();
-
-      if (!response.ok) {
-        throw new Error(updatedAlert.error || `Could not ${action} alert`);
-      }
+      const updatedAlert = await api.patch(`/alerts/${alertId}/${action}`);
 
       setAlerts(prev => {
         if (action === 'resolve') {
@@ -132,18 +113,10 @@ const AdvisorDashboard = ({ user, onLogout }) => {
   };
 
   const loadStudentNotes = async (studentId) => {
-    // Notes are cached per student so expanding the same panel is instant later.
     if (!advisorId || notesByStudent[studentId]) return;
 
     try {
-      const response = await fetch(
-        `http://localhost:5000/api/students/${studentId}/notes?advisorId=${advisorId}`,
-      );
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.error || 'Could not load notes');
-      }
+      const data = await api.get(`/students/${studentId}/notes?advisorId=${advisorId}`);
 
       setNotesByStudent(prev => ({
         ...prev,
@@ -178,16 +151,7 @@ const AdvisorDashboard = ({ user, onLogout }) => {
     setError('');
 
     try {
-      const response = await fetch(`http://localhost:5000/api/students/${studentId}/notes`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ advisor_id: advisorId, note }),
-      });
-      const savedNote = await response.json();
-
-      if (!response.ok) {
-        throw new Error(savedNote.error || 'Could not save note');
-      }
+      const savedNote = await api.post(`/students/${studentId}/notes`, { advisor_id: advisorId, note });
 
       setNotesByStudent(prev => ({
         ...prev,
@@ -208,15 +172,7 @@ const AdvisorDashboard = ({ user, onLogout }) => {
     setError('');
 
     try {
-      const response = await fetch(
-        `http://localhost:5000/api/notes/${noteId}?advisorId=${advisorId}`,
-        { method: 'DELETE' },
-      );
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.error || 'Could not delete note');
-      }
+      const data = await api.delete(`/notes/${noteId}?advisorId=${advisorId}`);
 
       setNotesByStudent(prev => ({
         ...prev,

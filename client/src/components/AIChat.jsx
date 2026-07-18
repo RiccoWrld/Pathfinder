@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
+import { api } from '../api';
 import './AIChat.css';
 
 const AIChat = ({ user, onStudentProfileUpdate, onAlertsSynced }) => {
@@ -41,15 +42,7 @@ const AIChat = ({ user, onStudentProfileUpdate, onAlertsSynced }) => {
     if (currentFile) formData.append("file", currentFile);
 
     try {
-      const response = await fetch("http://localhost:5000/api/ai/advisor", {
-        method: "POST",
-        body: formData,
-      });
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.error || "Advisor request failed");
-      }
+      const data = await api.post("/ai/advisor", formData, true);
 
       if (data.auditContext) {
         // Store parsed audit text so follow-up questions do not require re-uploading.

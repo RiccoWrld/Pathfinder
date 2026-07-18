@@ -2,6 +2,8 @@ const express = require("express");
 const cors = require("cors");
 require("dotenv").config();
 
+const { authenticate } = require("./middleware/auth");
+
 const advisorRoutes = require("./routes/advisors");
 const aiAdvisorRoutes = require("./routes/aiAdvisor");
 const alertRoutes = require("./routes/alerts");
@@ -18,10 +20,10 @@ app.use(express.json());
 // Group every backend feature behind the same /api prefix for the frontend.
 app.use("/api", universityRoutes);
 app.use("/api", authRoutes);
-app.use("/api", alertRoutes);
-app.use("/api", advisorRoutes);
-app.use("/api", aiAdvisorRoutes);
-app.use("/api", noteRoutes);
+app.use("/api", authenticate, alertRoutes);
+app.use("/api", authenticate, advisorRoutes);
+app.use("/api", authenticate, aiAdvisorRoutes);
+app.use("/api", authenticate, noteRoutes);
 
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
