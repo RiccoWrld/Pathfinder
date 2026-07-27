@@ -18,8 +18,11 @@ Pathfinder is a full-stack academic advising platform that helps students and ad
 - [Available Scripts](#available-scripts)
 - [API Overview](#api-overview)
 - [Development Workflow](#development-workflow)
+- [Testing](#testing)
+- [Database Migrations](#database-migrations)
 - [Troubleshooting](#troubleshooting)
 - [Security Notes](#security-notes)
+- [License](#license)
 
 ## Project Overview
 
@@ -36,12 +39,13 @@ Core goals:
 
 ### Authentication and Account Setup
 
-- Student and advisor signup.
+- Student and advisor signup with email/password validation.
 - Login with university email and password.
-- Password hashing with `bcryptjs`.
-- JWT-based session token generation.
+- Password hashing with `bcryptjs`, minimum 6-character policy.
+- JWT-based session token generation (24h expiry).
 - University selection during account creation.
 - Role-aware dashboards for students and advisors.
+- Rate limiting: 20 auth requests per 15 minutes.
 
 ### Student Dashboard
 
@@ -57,42 +61,28 @@ Core goals:
 
 - PDF upload support through `multer`.
 - DegreeWorks text extraction with `pdf-parse-fork`.
-- Audit summary extraction for:
-  - Overall or cumulative GPA.
-  - Academic standing.
-  - DegreeWorks Requirements percentage, such as the `98% Requirements` value shown in the DegreeWorks Degree Progress area.
-  - University name.
-  - Advisor name and email.
-  - In-progress requirements.
-  - Unmet or missing requirements.
-- Google Gemini integration for academic advising responses.
+- Audit summary extraction for GPA, academic standing, DegreeWorks Requirements percentage, university name, advisor name/email, in-progress and missing requirements.
+- Google Gemini integration (`gemini-2.5-flash`) for academic advising responses.
 - Prompt rules that keep audit-specific answers grounded in the uploaded audit.
-- Chat history support for follow-up questions.
+- Chat history support for follow-up questions (max 12 messages).
+- Rate limited to 30 requests per 15 minutes.
 
 ### Alert System
 
-- Database-backed academic alerts.
-- Alerts include category, priority, title, message, recommended action, source, status, acknowledgement timestamp, and resolution timestamp.
-- Student alert feed.
-- Advisor alert feed.
+- Database-backed academic alerts with category, priority, title, message, recommended action, source, status, acknowledgement, and resolution timestamps.
+- Student alert feed and advisor alert feed.
 - Alert acknowledgement and resolution endpoints.
-- Audit-based alert generation for:
-  - Academic standing or GPA concerns.
-  - Degree progress review.
-  - Missing course requirements.
-  - In-progress or unmet requirements.
+- Audit-based alert generation for academic standing/GPA concerns, degree progress review, and missing course requirements.
 - Duplicate prevention for previously acknowledged or resolved audit alerts.
 
 ### Advisor Dashboard
 
-- Advisor workspace with assigned student roster.
-- Prioritized active alerts.
-- High-priority alert counts.
-- Student detail view.
-- GPA, status, completion rate, and last audit upload display.
+- Advisor workspace with searchable/filterable student roster.
+- Prioritized active alerts with high-priority counts.
+- Student detail view with GPA, status, completion rate, and last audit upload.
 - Alert acknowledgement and resolution actions.
-- Advisor notes for each assigned student.
-- Add and delete advisor notes.
+- Advisor notes for each assigned student (add/delete).
+- Role-based access control (advisor-only routes).
 
 ### University Support
 
@@ -101,11 +91,11 @@ Core goals:
 - Advisor matching from audit data where available.
 - University domain and branding fields supported by the backend.
 
-### UI and UX
+### UI and Navigation
 
-- Modern login and signup experience.
-- Responsive student dashboard.
-- Advisor dashboard optimized for scanning and triage.
+- React Router for client-side navigation (`/login`, `/signup`, `/advisor`, `/student`).
+- Modern login and signup experience with shared brand panel.
+- Responsive student and advisor dashboards.
 - Alert cards with priority and status styling.
 - DegreeWorks Requirements progress-bar visualization.
 
@@ -115,6 +105,7 @@ Core goals:
 
 - React 19
 - Vite
+- React Router v7
 - Component-scoped CSS files
 - Browser `fetch` API
 - Local storage for session persistence
@@ -125,18 +116,19 @@ Core goals:
 - Express 5
 - PostgreSQL
 - `pg` connection pool
-- `dotenv`
-- `cors`
-- `bcryptjs`
-- `jsonwebtoken`
-- `multer`
-- `pdf-parse-fork`
+- `dotenv` / `cors`
+- `bcryptjs` / `jsonwebtoken`
+- `multer` / `pdf-parse-fork`
 - `@google/generative-ai`
+- `express-rate-limit`
+- `postgrator` (migrations)
+- `jest` (testing)
 
 ### Database
 
 - PostgreSQL
 - SQL schema/bootstrap script in `setup.sql`
+- Programmatic migrations in `server/migrations/`
 
 ## Project Structure
 
@@ -159,6 +151,7 @@ Pathfinder/
 |   |   |   |-- SignUp.css
 |   |   |   |-- StudentDashboard.jsx
 |   |   |   `-- StudentDashboard.css
+|   |   |-- api.js
 |   |   |-- App.css
 |   |   |-- App.jsx
 |   |   |-- index.css
@@ -166,6 +159,15 @@ Pathfinder/
 |   |-- package.json
 |   `-- vite.config.js
 |-- server/
+|   |-- __tests__/
+|   |   |-- auth.test.js
+|   |   |-- auditParser.test.js
+|   |   `-- chatHistory.test.js
+|   |-- middleware/
+|   |   |-- auth.js
+|   |   `-- rateLimiter.js
+|   |-- migrations/
+|   |   `-- 001.initial-schema.sql
 |   |-- routes/
 |   |   |-- advisors.js
 |   |   |-- aiAdvisor.js
@@ -182,8 +184,12 @@ Pathfinder/
 |   |   `-- chatHistory.js
 |   |-- db.js
 |   |-- index.js
+|   |-- migrate.js
 |   `-- package.json
+|-- .env.example
+|-- docker-compose.yml
 |-- setup.sql
+|-- ROADMAP.md
 `-- README.md
 ```
 
@@ -208,7 +214,7 @@ git --version
 
 ## Environment Variables
 
-Create a `.env` file inside the `server` directory. This file is intentionally not committed to the repository because it contains private secrets and machine-specific database credentials.
+Create a `.env` file inside the `server` directory:
 
 ```env
 PORT=5000
@@ -217,180 +223,81 @@ JWT_SECRET=replace_with_a_long_random_secret
 GEMINI_API_KEY=replace_with_your_gemini_api_key
 ```
 
-### How to Create `DATABASE_URL`
+For the client (optional, defaults to `http://localhost:5000/api`), create `client/.env`:
 
-Each developer needs their own PostgreSQL connection string. Do not share your personal database password or commit a real `DATABASE_URL` to GitHub.
+```env
+VITE_API_URL=http://localhost:5000/api
+```
 
-Connection string format:
+### Connection String Format
 
 ```text
 postgresql://USERNAME:PASSWORD@HOST:PORT/DATABASE_NAME
 ```
 
-Local PostgreSQL example:
+Local examples:
 
 ```env
 DATABASE_URL=postgresql://postgres:your_password@localhost:5432/pathfinder
-```
-
-If your PostgreSQL username is `postgres`, your password is `admin123`, and your database is named `pathfinder`, then use:
-
-```env
-DATABASE_URL=postgresql://postgres:admin123@localhost:5432/pathfinder
-```
-
-If PostgreSQL was installed without a password for your local user, the connection string may look more like:
-
-```env
 DATABASE_URL=postgresql://localhost:5432/pathfinder
 ```
 
-For a hosted PostgreSQL database such as Render, Supabase, Neon, Railway, or another cloud provider, copy the provider's PostgreSQL connection URL and paste it as `DATABASE_URL`. Hosted URLs usually include a remote host name and often require SSL. The backend automatically uses non-SSL for `localhost` and SSL for hosted database URLs.
+The backend automatically uses non-SSL for `localhost` and SSL for hosted database URLs.
 
-Variable details:
+### Environment Variable Reference
 
 | Variable | Required | Description |
 | --- | --- | --- |
 | `PORT` | No | Backend port. Defaults to `5000`. |
-| `DATABASE_URL` | Yes | PostgreSQL connection string used by the backend. Each computer or cloud environment needs its own value. |
+| `DATABASE_URL` | Yes | PostgreSQL connection string. |
 | `JWT_SECRET` | Recommended | Secret used to sign JWT tokens. The app has a fallback, but production should always set this. |
 | `GEMINI_API_KEY` | Yes for AI chat | Google Gemini API key used by the AI advisor route. |
+| `VITE_API_URL` | No (client) | Backend URL for the frontend. Defaults to `http://localhost:5000/api`. |
 
-Generate a stronger `JWT_SECRET` with one of these commands:
+Generate a strong `JWT_SECRET`:
 
 ```bash
-node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
-```
-
-Windows PowerShell:
-
-```powershell
 node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
 ```
 
 ## Database Setup
 
-Start PostgreSQL, then create a local database named `pathfinder`:
+### Option A: Bootstrap Script (Quick Start)
 
 ```bash
 createdb pathfinder
-```
-
-Run the schema/bootstrap script:
-
-```bash
 psql -d pathfinder -f setup.sql
 ```
 
-If your database requires a username:
+### Option B: Programmatic Migrations (Recommended)
 
 ```bash
-psql -U postgres -d pathfinder -f setup.sql
+createdb pathfinder
+cd server
+npm run migrate
 ```
 
-If your database uses a password, PostgreSQL will prompt for it. You can also connect with the full connection string:
+Migrations track which scripts have been applied in a `migrations` table, making it safer for ongoing schema changes.
 
-```bash
-psql "postgresql://postgres:your_password@localhost:5432/pathfinder" -f setup.sql
+The `setup.sql` script includes demo data for testing:
+
+```text
+Advisor: sarah.path@university.edu / password123
+Student: alice.johnson@university.edu / password123
+Student: jordan.smith@university.edu / password123
 ```
 
-Windows PowerShell:
-
-```powershell
-psql "postgresql://postgres:your_password@localhost:5432/pathfinder" -f setup.sql
-```
-
-If you are using a hosted database, run the same setup script against the hosted URL:
-
-```bash
-psql "$DATABASE_URL" -f setup.sql
-```
-
-Windows PowerShell:
-
-```powershell
-psql $env:DATABASE_URL -f setup.sql
-```
-
-The backend expects tables for:
-
-- `users`
-- `universities`
-- `advisors`
-- `students`
-- `alerts`
-- `advisor_notes`
-
-It also expects student/advisor university fields and audit progress fields used by the dashboard and alert sync. If your local database was created before those fields existed, update the schema before running the newest backend.
-
-Important student progress columns:
-
-- `completion_rate`: stores the DegreeWorks Requirements percentage displayed in the student dashboard progress bar.
-- `requirement_completed_count`
-- `requirement_in_progress_count`
-- `requirement_missing_count`
-- `requirement_total_count`
-
-The backend includes a small schema guard that can automatically add the requirement count columns if an older local database is missing them. Running `setup.sql` is still the recommended way to keep the whole schema current.
-
-### Blank Database vs Demo Data
-
-`setup.sql` creates the schema and may include demo university, advisor, student, user, alert, and note records for testing. For a clean classroom or production-style setup, remove or skip the demo `INSERT INTO users`, `INSERT INTO advisors`, `INSERT INTO students`, `INSERT INTO alerts`, and `INSERT INTO advisor_notes` statements before running it, or clear those tables after setup:
-
-```sql
-TRUNCATE TABLE advisor_notes, alerts, students, advisors, users RESTART IDENTITY CASCADE;
-```
-
-Keep the `universities` rows unless you want users to create accounts without preloaded university options.
-
-### Common Local PostgreSQL Credential Cases
-
-If you know your PostgreSQL password, use it in `DATABASE_URL`.
-
-If you do not know the `postgres` password, you can set one:
-
-```bash
-psql -U postgres
-```
-
-Then inside the PostgreSQL prompt:
-
-```sql
-ALTER USER postgres WITH PASSWORD 'your_password';
-\q
-```
-
-On Linux, you may need to run the prompt as the `postgres` system user:
-
-```bash
-sudo -u postgres psql
-```
-
-If your local PostgreSQL setup uses your computer username instead of `postgres`, create the database under that user and use a URL like:
-
-```env
-DATABASE_URL=postgresql://localhost:5432/pathfinder
-```
+For a clean instance, remove the `INSERT INTO` statements from `setup.sql` before running it, or truncate those tables after setup.
 
 ## Installation
-
-Clone the repository:
 
 ```bash
 git clone <repository-url>
 cd Pathfinder
-```
 
-Install backend dependencies:
-
-```bash
 cd server
 npm install
-```
 
-Install frontend dependencies:
-
-```bash
 cd ../client
 npm install
 ```
@@ -409,8 +316,6 @@ cd server
 npm run dev
 ```
 
-If the backend starts correctly, you should see a message that the server is running on port `5000`.
-
 Start the frontend in a second terminal:
 
 ```bash
@@ -418,105 +323,48 @@ cd client
 npm run dev
 ```
 
-Open the app:
-
-```text
-http://localhost:5173
-```
+Open the app at `http://localhost:5173`.
 
 First-run checklist:
 
 1. Confirm PostgreSQL is running.
-2. Confirm `server/.env` exists.
-3. Confirm `DATABASE_URL` points to a database that exists.
-4. Run `setup.sql`.
-5. Start the backend.
-6. Start the frontend.
-7. Create an advisor account.
-8. Create a student account at the same university.
-9. Upload a DegreeWorks PDF from the student dashboard.
-10. Confirm alerts and progress appear on both dashboards.
-
-For production-style frontend testing:
-
-```bash
-cd client
-npm run build
-npm run preview
-```
+2. Confirm `server/.env` exists with `DATABASE_URL`.
+3. Create the database and run migrations (`npm run migrate` from `server/`).
+4. Start the backend.
+5. Start the frontend.
+6. Create an advisor account, then a student account at the same university.
+7. Upload a DegreeWorks PDF from the student dashboard.
+8. Confirm alerts and progress appear on both dashboards.
 
 ## Running with Docker
 
 Pathfinder can run as a Docker Compose stack, which starts the database, backend API, and frontend app together.
 
-Make sure Docker Desktop is installed and the Docker engine is running before using these commands.
-
-The Docker stack exposes:
-
-- PostgreSQL database: `localhost:5432`
-- Backend API: `http://localhost:5000`
-- Frontend app: `http://localhost:5173`
-
-From the project root, create a local `.env` file from the example:
+From the project root, create `.env`:
 
 ```bash
 cp .env.example .env
 ```
 
-On Windows PowerShell, use:
-
-```powershell
-Copy-Item .env.example .env
-```
-
-Update `.env` with your local secrets:
+Update `.env` with your secrets:
 
 ```env
 JWT_SECRET=replace_with_a_long_random_secret
 GEMINI_API_KEY=replace_with_your_gemini_api_key
 ```
 
-`JWT_SECRET` can be any long random private string. `GEMINI_API_KEY` must be a real Google Gemini API key for the AI advisor to answer audit questions.
-
-Start the full stack from the project root:
+Start the full stack:
 
 ```bash
 docker compose up --build
 ```
 
-Open the app at:
+Open the app at `http://localhost:5173`.
 
-```text
-http://localhost:5173
-```
-
-The first startup can take a little longer because Docker builds the client and server images and initializes PostgreSQL.
-
-To stop the app, press `Ctrl+C` in the terminal running Docker Compose. You can also stop and remove the containers with:
-
-```bash
-docker compose down
-```
-
-The database container automatically runs `setup.sql` the first time the Docker volume is created. If you need to reset the Docker database and seed it again, remove the volume:
+The database container automatically runs `setup.sql` on first start. To reset:
 
 ```bash
 docker compose down -v
-docker compose up --build
-```
-
-Useful demo credentials seeded by `setup.sql`:
-
-```text
-Advisor: sarah.path@university.edu / password123
-Student: alice.johnson@university.edu / password123
-Student: jordan.smith@university.edu / password123
-```
-
-If login works but the AI advisor says the Gemini key is missing or invalid, update `GEMINI_API_KEY` in `.env`, then restart the stack:
-
-```bash
-docker compose down
 docker compose up --build
 ```
 
@@ -525,72 +373,29 @@ docker compose up --build
 ### Windows PowerShell
 
 ```powershell
-git clone <repository-url>
-cd Pathfinder
-
 cd server
 npm install
-```
-
-Create `server\.env`:
-
-```powershell
 New-Item -ItemType File -Path .env
 notepad .env
-```
+# Add PORT, DATABASE_URL, JWT_SECRET, GEMINI_API_KEY
 
-Add your values:
-
-```env
-PORT=5000
-DATABASE_URL=postgresql://postgres:your_password@localhost:5432/pathfinder
-JWT_SECRET=replace_with_a_long_random_secret
-GEMINI_API_KEY=replace_with_your_gemini_api_key
-```
-
-Create and initialize the database from the project root:
-
-```powershell
-cd ..
-createdb pathfinder
-psql "postgresql://postgres:your_password@localhost:5432/pathfinder" -f setup.sql
-```
-
-Start the backend:
-
-```powershell
-cd server
-npm run dev
-```
-
-In another PowerShell window, start the frontend:
-
-```powershell
-cd Pathfinder\client
+cd ../client
 npm install
+
+# Start backend
+cd ../server
 npm run dev
-```
 
-If `createdb` or `psql` is not recognized, add the PostgreSQL `bin` folder to your PATH. A common location is:
-
-```text
-C:\Program Files\PostgreSQL\<version>\bin
+# Start frontend (new terminal)
+cd Pathfinder\client
+npm run dev
 ```
 
 ### macOS
 
-Install dependencies with Homebrew if needed:
-
 ```bash
 brew install node postgresql git
 brew services start postgresql
-```
-
-Run the project:
-
-```bash
-git clone <repository-url>
-cd Pathfinder
 
 cd server
 npm install
@@ -600,44 +405,29 @@ DATABASE_URL=postgresql://postgres:your_password@localhost:5432/pathfinder
 JWT_SECRET=replace_with_a_long_random_secret
 GEMINI_API_KEY=replace_with_your_gemini_api_key
 EOF
-cd ..
 
-createdb pathfinder
-psql "postgresql://postgres:your_password@localhost:5432/pathfinder" -f setup.sql
-
-cd server
-npm run dev
-```
-
-In another terminal:
-
-```bash
-cd Pathfinder/client
+cd ../client
 npm install
+
+# Start backend
+cd ../server
+npm run dev
+
+# Start frontend (new terminal)
+cd ../client
 npm run dev
 ```
 
-### Linux
-
-Install system dependencies on Debian or Ubuntu:
+### Linux (Debian/Ubuntu)
 
 ```bash
 sudo apt update
 sudo apt install -y nodejs npm postgresql postgresql-contrib git
 sudo systemctl enable --now postgresql
-```
 
-Create the database:
-
-```bash
 sudo -u postgres createdb pathfinder
-```
 
-Create `server/.env`:
-
-```bash
-git clone <repository-url>
-cd Pathfinder/server
+cd server
 npm install
 cat > .env <<'EOF'
 PORT=5000
@@ -645,45 +435,26 @@ DATABASE_URL=postgresql://postgres:your_password@localhost:5432/pathfinder
 JWT_SECRET=replace_with_a_long_random_secret
 GEMINI_API_KEY=replace_with_your_gemini_api_key
 EOF
-```
+npm run migrate
 
-Initialize the database from the project root:
-
-```bash
-cd ..
-psql "postgresql://postgres:your_password@localhost:5432/pathfinder" -f setup.sql
-```
-
-Run the backend:
-
-```bash
-cd server
-npm run dev
-```
-
-Run the frontend in another terminal:
-
-```bash
-cd Pathfinder/client
+cd ../client
 npm install
-npm run dev
 ```
 
 ## Available Scripts
 
-### Backend Scripts
-
-Run from `server/`.
+### Backend Scripts (from `server/`)
 
 | Script | Description |
 | --- | --- |
 | `npm start` | Starts the Express server with Node. |
 | `npm run dev` | Starts the Express server with Nodemon for development. |
-| `npm test` | Placeholder test script. |
+| `npm test` | Runs Jest test suite (21 tests). |
+| `npm run test:watch` | Runs tests in watch mode. |
+| `npm run migrate` | Applies pending database migrations with postgrator. |
+| `npm run migrate:create <name>` | Creates a new migration SQL file. |
 
-### Frontend Scripts
-
-Run from `client/`.
+### Frontend Scripts (from `client/`)
 
 | Script | Description |
 | --- | --- |
@@ -694,30 +465,28 @@ Run from `client/`.
 
 ## API Overview
 
-All backend routes are mounted under `/api`.
+All backend routes are mounted under `/api`. Rate limits apply per route group.
 
-### Authentication
+### Authentication (rate limit: 20/15min)
 
 | Method | Route | Description |
 | --- | --- | --- |
-| `POST` | `/api/auth/signup` | Creates a student or advisor account. |
+| `POST` | `/api/auth/signup` | Creates a student or advisor account. Requires valid email format, password 6+ characters. |
 | `POST` | `/api/auth/login` | Logs in a user and returns a JWT plus profile data. |
 
-### Universities
+### Universities (rate limit: 200/15min)
 
 | Method | Route | Description |
 | --- | --- | --- |
 | `GET` | `/api/universities` | Returns available universities for signup. |
 
-### AI Advisor
+### AI Advisor (rate limit: 30/15min, authenticated)
 
 | Method | Route | Description |
 | --- | --- | --- |
 | `POST` | `/api/ai/advisor` | Accepts chat input and optional DegreeWorks PDF upload, extracts audit context, syncs alerts, and returns an AI advisor response. |
 
-The AI advisor route also parses the DegreeWorks Degree Progress section. When the audit text contains a value such as `98% Requirements`, that value is returned as `auditSummary.completion_rate`, saved on the student profile, and displayed in the student dashboard progress bar.
-
-### Alerts
+### Alerts (rate limit: 200/15min, authenticated)
 
 | Method | Route | Description |
 | --- | --- | --- |
@@ -727,24 +496,22 @@ The AI advisor route also parses the DegreeWorks Degree Progress section. When t
 | `PATCH` | `/api/alerts/:alertId/acknowledge` | Marks an active alert as acknowledged. |
 | `PATCH` | `/api/alerts/:alertId/resolve` | Resolves an alert. |
 
-### Advisors
+### Advisors (rate limit: 200/15min, authenticated, advisor role required)
 
 | Method | Route | Description |
 | --- | --- | --- |
 | `GET` | `/api/advisors/:advisorId/alerts` | Returns active alerts for an advisor's students. |
 | `GET` | `/api/advisors/:advisorId/students` | Returns assigned students and alert counts. |
 
-### Advisor Notes
+### Advisor Notes (rate limit: 200/15min, authenticated)
 
 | Method | Route | Description |
 | --- | --- | --- |
 | `GET` | `/api/students/:studentId/notes` | Returns advisor notes for a student. |
-| `POST` | `/api/students/:studentId/notes` | Adds a note for an assigned student. |
+| `POST` | `/api/students/:studentId/notes` | Adds a note for an assigned student (max 2000 chars). |
 | `DELETE` | `/api/notes/:noteId` | Deletes an advisor note. |
 
 ## Development Workflow
-
-Recommended workflow:
 
 1. Start PostgreSQL.
 2. Start the backend in `server`.
@@ -758,82 +525,71 @@ Recommended workflow:
 Before submitting changes:
 
 ```bash
-cd client
-npm run build
-npm run lint
+cd client && npm run build && npm run lint
+cd ../server && npm test
 ```
 
-Backend syntax check examples:
+## Testing
+
+The server includes a Jest test suite with 21 tests across 3 files:
 
 ```bash
-cd ..
-node --check server/index.js
-node --check server/routes/aiAdvisor.js
-node --check server/services/alertSync.js
+cd server
+npm test
 ```
+
+Test coverage includes:
+
+- **Auth middleware**: Missing/invalid tokens, role-based authorization.
+- **Chat history parsing**: Empty history, role filtering, deduplication, message limits.
+- **Audit parser**: Text normalization, university/GPA/standing extraction.
+
+## Database Migrations
+
+Migrations use `postgrator` and live in `server/migrations/` as sequential SQL files.
+
+```bash
+# Apply all pending migrations
+cd server
+npm run migrate
+
+# Create a new migration
+npm run migrate:create 002.add-some-column
+```
+
+The migration runner tracks applied files in a `migrations` table. Migrations are idempotent (use `IF NOT EXISTS` / `IF EXISTS` where appropriate).
 
 ## Troubleshooting
 
 ### Frontend cannot connect to backend
 
-Confirm the backend is running on port `5000`:
-
-```bash
-cd server
-npm run dev
-```
-
-The frontend currently calls API routes at `http://localhost:5000`.
+Confirm the backend is running on port `5000`. The frontend reads `VITE_API_URL` from `client/.env` or defaults to `http://localhost:5000/api`.
 
 ### Database connection errors
 
-Check `server/.env` and confirm `DATABASE_URL` points to an existing PostgreSQL database.
+Check `server/.env` and confirm `DATABASE_URL`:
 
 ```bash
 psql "$DATABASE_URL"
 ```
 
-On Windows PowerShell:
-
-```powershell
-psql $env:DATABASE_URL
-```
-
 ### Signup fails because universities do not load
 
-Confirm the `universities` table exists and has at least one row. The signup form depends on:
+Confirm the `universities` table exists and has at least one row:
 
 ```sql
-SELECT id, name, domain, branding_color FROM universities ORDER BY name ASC;
+SELECT id, name FROM universities ORDER BY name;
 ```
 
 ### AI advisor returns an error
 
-Check that `GEMINI_API_KEY` is set in `server/.env`, then restart the backend. Also confirm the uploaded file is a PDF.
-
-### Alerts reappear after refresh
-
-Audit-generated alerts are keyed by category, title, and message. If an identical audit alert was previously acknowledged or resolved, the sync should skip recreating it. If the audit text changes and generates a different alert message, Pathfinder treats it as a new alert.
+Check `GEMINI_API_KEY` is set in `server/.env`, then restart the backend. Verify the uploaded file is a PDF.
 
 ### Port already in use
 
-Backend:
-
 ```bash
-PORT=5001 npm run dev
-```
-
-Windows PowerShell:
-
-```powershell
-$env:PORT=5001
-npm run dev
-```
-
-Frontend:
-
-```bash
-npm run dev -- --port 5174
+PORT=5001 npm run dev        # Backend
+npm run dev -- --port 5174   # Frontend
 ```
 
 ## Security Notes
@@ -843,19 +599,9 @@ npm run dev -- --port 5174
 - Keep `GEMINI_API_KEY` private.
 - Use HTTPS and secure cookies/session handling for production deployments.
 - Restrict CORS origins before deploying publicly.
+- Rate limiting is configured for auth (20/15min), AI (30/15min), and general API (200/15min).
+- Role-based authorization restricts advisor routes to users with `role: "advisor"` in their JWT.
 - Store production databases with SSL enabled and regular backups.
-- Review authentication and authorization rules before using Pathfinder with real student records.
-
-## Production Considerations
-
-Before deploying Pathfinder beyond local development:
-
-- Move hard-coded frontend API URLs into environment variables.
-- Add database migrations instead of relying only on a bootstrap SQL file.
-- Add automated backend tests for auth, alerts, audit parsing, and advisor routes.
-- Add frontend tests for login, signup, dashboards, and alert actions.
-- Add request validation and rate limiting.
-- Add structured logging and monitoring.
 - Review FERPA or institutional privacy requirements before storing real academic data.
 
 ## License
