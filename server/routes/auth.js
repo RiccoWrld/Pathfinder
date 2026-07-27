@@ -36,6 +36,14 @@ router.post("/auth/signup", async (req, res) => {
       .json({ error: "email, password, and university_id are required" });
   }
 
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalizedEmail)) {
+    return res.status(400).json({ error: "Invalid email format" });
+  }
+
+  if (password.length < 6) {
+    return res.status(400).json({ error: "Password must be at least 6 characters" });
+  }
+
   if (!["student", "advisor"].includes(normalizedRole)) {
     return res.status(400).json({ error: "role must be student or advisor" });
   }
@@ -122,6 +130,9 @@ router.post("/auth/signup", async (req, res) => {
 
 router.post("/auth/login", async (req, res) => {
   const { email, password } = req.body;
+  if (!email || !password) {
+    return res.status(400).json({ error: "email and password are required" });
+  }
   try {
     // Make sure older databases can support the latest dashboard fields.
     await ensureRequirementProgressColumns(pool);
