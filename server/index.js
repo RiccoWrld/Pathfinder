@@ -2,7 +2,7 @@ const express = require("express");
 const cors = require("cors");
 require("dotenv").config();
 
-const { authenticate } = require("./middleware/auth");
+const { authenticate, authorize } = require("./middleware/auth");
 
 const advisorRoutes = require("./routes/advisors");
 const aiAdvisorRoutes = require("./routes/aiAdvisor");
@@ -21,7 +21,7 @@ app.use(express.json());
 app.use("/api", universityRoutes);
 app.use("/api", authRoutes);
 app.use("/api", authenticate, alertRoutes);
-app.use("/api", authenticate, advisorRoutes);
+app.use("/api", authenticate, authorize("advisor"), advisorRoutes);
 app.use("/api", authenticate, aiAdvisorRoutes);
 app.use("/api", authenticate, noteRoutes);
 
