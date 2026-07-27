@@ -1,6 +1,5 @@
 const express = require("express");
 const pool = require("../db");
-const { authorize } = require("../middleware/auth");
 const { ensureRequirementProgressColumns } = require("../services/schemaGuards");
 const { ensureCurrentProfileAlerts } = require("../services/alertSync");
 
