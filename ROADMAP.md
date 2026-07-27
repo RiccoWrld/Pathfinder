@@ -6,11 +6,11 @@
 - [x] Move hardcoded API URLs to env/config
 
 ## Priority 2: Reliability
-- [ ] Add tests (unit + integration)
-- [ ] Set up DB migration tooling
-- [ ] Add request validation & rate limiting
+- [x] Add tests (unit + integration)
+- [x] Set up DB migration tooling
+- [x] Add request validation & rate limiting
 
 ## Priority 3: UX & Polish
-- [ ] Add React Router for navigation
-- [ ] Clean up unused deps and dead code
-- [ ] Consider TypeScript migration
+- [x] Add React Router for navigation
+- [x] Clean up unused deps and dead code
+- [x] Consider TypeScript migration (recommended: start with client; TS types already installed, Vite supports .ts/.tsx out of the box)
