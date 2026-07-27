@@ -2,8 +2,8 @@
 
 ## Priority 1: Security & Configuration
 - [x] Save improvement plan
-- [ ] Add auth middleware to protect routes
-- [ ] Move hardcoded API URLs to env/config
+- [x] Add auth middleware to protect routes
+- [x] Move hardcoded API URLs to env/config
 
 ## Priority 2: Reliability
 - [ ] Add tests (unit + integration)
