@@ -7,7 +7,9 @@
     "start": "node index.js",
     "dev": "nodemon index.js",
     "test": "jest --forceExit --detectOpenHandles",
-    "test:watch": "jest --watch"
+    "test:watch": "jest --watch",
+    "migrate": "node migrate.js",
+    "migrate:create": "node -e \"require('fs').writeFileSync('migrations/' + process.argv[1] + '.sql', '-- Migration\\n', 'utf8'); console.log('Created migration: migrations/' + process.argv[1] + '.sql')\""
   },
   "keywords": [],
   "author": "",
@@ -23,7 +25,8 @@
     "pdf-lib": "^1.17.1",
     "pdf-parse": "^2.4.5",
     "pdf-parse-fork": "^1.2.0",
-    "pg": "^8.20.0"
+    "pg": "^8.20.0",
+    "postgrator": "^8.0.0"
   },
   "devDependencies": {
     "jest": "^30.4.2",
