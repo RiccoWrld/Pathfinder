@@ -1,13 +1,28 @@
-const MAX_AUDIT_CONTEXT_CHARS = 90000;
+const MAX_AUDIT_CONTEXT_CHARS = 400000;
 
 const normalizeAuditText = (text = "") => {
   // Normalize PDF text before both regex parsing and AI prompting.
-  return text
+  // DegreeWorks audits can be dozens of pages long, so use a generous cap
+  // instead of the old 90k cutoff that hid course-level detail from the AI.
+  const normalized = text
     .replace(/\r/g, "\n")
     .replace(/[ \t]+/g, " ")
     .replace(/\n{3,}/g, "\n\n")
-    .trim()
-    .slice(0, MAX_AUDIT_CONTEXT_CHARS);
+    .trim();
+
+  if (normalized.length <= MAX_AUDIT_CONTEXT_CHARS) {
+    return normalized;
+  }
+
+  // When an audit still exceeds the cap, keep both the summary header and the
+  // tail (course listings / requirement detail) rather than only the start.
+  const headLength = Math.floor(MAX_AUDIT_CONTEXT_CHARS * 0.6);
+  const tailLength = MAX_AUDIT_CONTEXT_CHARS - headLength;
+  return (
+    normalized.slice(0, headLength) +
+    "\n\n[--- audit text truncated here for size ---]\n\n" +
+    normalized.slice(-tailLength)
+  );
 };
 
 const clampPercent = (value) => {

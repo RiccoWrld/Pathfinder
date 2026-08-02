@@ -7,7 +7,7 @@ services:
       POSTGRES_USER: pathfinder
       POSTGRES_PASSWORD: pathfinder_password
     ports:
-      - "5432:5432"
+      - "5440:5432"
     volumes:
       - pathfinder-db-data:/var/lib/postgresql/data
       - ./setup.sql:/docker-entrypoint-initdb.d/001-setup.sql:ro
@@ -38,7 +38,7 @@ services:
       context: ./client
     restart: unless-stopped
     ports:
-      - "5173:80"
+      - "5174:80"
     depends_on:
       - server
 

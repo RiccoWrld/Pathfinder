@@ -14,10 +14,14 @@ describe("normalizeAuditText", () => {
     expect(result).toBe("hello world");
   });
 
-  it("caps at 90000 characters", () => {
-    const long = "a".repeat(100000);
+  it("caps at 400000 characters and keeps the audit tail", () => {
+    const long = "a".repeat(500000);
     const result = normalizeAuditText(long);
-    expect(result.length).toBe(90000);
+    expect(result).toContain("[--- audit text truncated here for size ---]");
+    expect(result.length).toBeLessThan(401000);
+    expect(result.length).toBeGreaterThan(399000);
+    expect(result.startsWith("a".repeat(1000))).toBe(true);
+    expect(result.endsWith("a".repeat(1000))).toBe(true);
   });
 });
 

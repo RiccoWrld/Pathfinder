@@ -22,8 +22,8 @@ app.use(express.json());
 app.use("/api", apiLimiter, universityRoutes);
 app.use("/api", authLimiter, authRoutes);
 app.use("/api", authenticate, apiLimiter, alertRoutes);
-app.use("/api", authenticate, authorize("advisor"), apiLimiter, advisorRoutes);
 app.use("/api", authenticate, aiLimiter, aiAdvisorRoutes);
+app.use("/api", authenticate, authorize("advisor"), apiLimiter, advisorRoutes);
 app.use("/api", authenticate, apiLimiter, noteRoutes);
 
 const PORT = process.env.PORT || 5000;
